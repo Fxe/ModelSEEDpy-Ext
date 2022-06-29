@@ -1,0 +1,12 @@
+bigg	Glc/O2	Ac/O2	Glyc/O2	LLac/O2	For/O2	Glc	Ac	Glyc	Llac	For	mal-L	For/NO2	For/NO	Pyr/NO	Ac/NO2	Ac/NO	For/SO4	LLac/SO4	empty
+EX_glc__D_e	1	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0	0	0
+EX_mal__L_e	0	0	0	0	0	0	0	0	0	0	1	0	0	0	0	0	0	0	0
+EX_lac__L_e	0	0	0	1	0	0	0	0	1	0	0	0	0	0	0	0	0	1	0
+EX_glyc_e	0	0	1	0	0	0	0	1	0	0	0	0	0	0	0	0	0	0	0
+EX_ac_e	0	1	0	0	0	0	1	0	0	0	0	0	0	0	1	1	0	0	0
+EX_for_e	0	0	0	0	1	0	0	0	0	1	0	1	1	0	0	0	1	0	0
+EX_co2_e	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+EX_o2_e	1000	1000	1000	1000	1000	0	0	0	0	0	0	0	0	0	0	0	0	0	0
+EX_no_e	0	0	0	0	0	0	0	0	0	0	0	0	1000	1000	0	1000	0	0	0
+EX_no2_e	0	0	0	0	0	0	0	0	0	0	0	1000	0	0	1000	0	0	0	0
+EX_so4_e	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	1000	1000	0
