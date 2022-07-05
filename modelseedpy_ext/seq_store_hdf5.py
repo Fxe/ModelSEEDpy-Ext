@@ -14,10 +14,10 @@ class SeqStoreHdf5:
         if len(v) == 0:
             return True
         raise ValueError("Invalid input - unaccepted characters:" + ', '.join(v))
-    
-    def get_sequence_hash(self, seq):
-        h = hashlib.sha256(seq.encode('utf-8')).hexdigest()
-        return h
+
+    @staticmethod
+    def get_sequence_hash(seq):
+        return hashlib.sha256(seq.encode('utf-8')).hexdigest()
     
     def store_sequence(self, seq):
         self.validate_sequence(seq)
@@ -35,26 +35,28 @@ class SeqStoreHdf5:
     def close(self):
         self.h5_store.close()
         return self.h5_store
-    
+
+
 def load_dna_seq_store_h5(path, mode):
     h5_store = h5py.File(path, mode)
     s = SeqStoreHdf5(h5_store)
-    #K	Guanine / Thymine
-    #M	Adenine / Cytosine
-    #S	Guanine / Cytosine
-    #W	Adenine / Thymine
-    #B	Guanine / Thymine / Cytosine
-    #D	Guanine / Adenine / Thymine
-    #H	Adenine / Cytosine / Thymine
-    #V	Guanine / Cytosine / Adenine
+    # K	Guanine / Thymine
+    # M	Adenine / Cytosine
+    # S	Guanine / Cytosine
+    # W	Adenine / Thymine
+    # B	Guanine / Thymine / Cytosine
+    # D	Guanine / Adenine / Thymine
+    # H	Adenine / Cytosine / Thymine
+    # V	Guanine / Cytosine / Adenine
     s.CHARSET_VALIDATION = {
-        'A', 'C', 'G', 'T', 'U', #Adenine, Cytosine, Guanine, Thymine, Uracil
-        'R', 'Y', #Guanine / Adenine (purine), Cytosine / Thymine (pyrimidine)
+        'A', 'C', 'G', 'T', 'U',  # Adenine, Cytosine, Guanine, Thymine, Uracil
+        'R', 'Y',  # Guanine / Adenine (purine), Cytosine / Thymine (pyrimidine)
         'K', 'M', 'S', 'W', 
         'B', 'D', 'H', 'V', 
-        'N' #Adenine / Guanine / Cytosine / Thymine
+        'N'  # Adenine / Guanine / Cytosine / Thymine
     }
     return s
+
 
 def load_protein_seq_store_h5(path, mode):
     h5_store = h5py.File(path, mode)

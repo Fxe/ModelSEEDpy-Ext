@@ -1,5 +1,18 @@
 import networkx as nx
 
+
+class Node:
+
+    def __init__(self, key, label, data=None):
+        self.key = key
+        self.label = label
+        self.data = data | {}
+
+    @property
+    def id(self):
+        return f'{self.label}/{self.key}'
+
+
 class ETLTransformUniprot:
     
     def __init__(self, seq_store_protein):
@@ -23,6 +36,10 @@ class ETLTransformUniprot:
         self.uniprot_collection_has_cofactor_chebi = 'uniprotkb_sprot_has_cofactor_chebi_term'
         self.uniprot_collection_has_reaction_rhea = 'uniprotkb_sprot_has_catalytic_activity_rhea_reaction'
         self.uniprot_collection_has_reaction_ec = 'uniprotkb_has_catalytic_activity_ec_number'
+
+    @staticmethod
+    def build_node(node_id, label, data=None):
+        return Node(node_id, label, data)
         
     @staticmethod
     def get_cofactor(o):
@@ -97,12 +114,15 @@ class ETLTransformUniprot:
         return comment_location
     
     @staticmethod
-    def transform_edge(src, dst, data=None):
-        return {
-            '_key': '{}:{}'.format(src['_key'], dst['_key']),
+    def transform_edge(src: Node, dst: Node, data=None):
+        _edge = {
+            '_key': '{}:{}'.format(src.key, dst.key),
             '_from': src,
             '_to': dst,
         }
+        if data:
+            _edge.update(data)
+        return _edge
     
     def transform(self, o):
         nodes = {
@@ -128,15 +148,28 @@ class ETLTransformUniprot:
             self.uniprot_collection_has_ec: [],
             self.uniprot_collection_has_reaction_ec: [],
         }
-        sprot_node = {
-            '_key': '_'.join(sorted(o['accession']))
-        }
-        nodes[self.uniprot_collection].append(sprot_node)
+
+        def add_node(node_id, label, data=None):
+            if label in nodes:
+                _node = self.build_node(node_id, label, data)
+                nodes[label].append(_node)
+                return _node
+
+            return None
+
+        def add_edge(node_from, node_to, label, data=None):
+            if label in edges:
+                _edge = self.transform_edge(node_from, node_to, data)
+                edges[label].append(_edge)
+                return _edge
+
+            return None
+
+        node_uniprotkb = self.build_node('_'.join(sorted(o['accession'])), self.uniprot_collection)
+        nodes[self.uniprot_collection].append(node_uniprotkb)
         for i in o['accession']:
-            node_accession = {'_key': i}
-            nodes[self.uniprot_accession_collection].append(node_accession)
-            edges[self.uniprot_collection_has_accession].append(
-                self.transform_edge(sprot_node, node_accession))
+            node_accession = add_node(i, self.uniprot_accession_collection)
+            add_edge(node_uniprotkb, node_accession, self.uniprot_collection_has_accession)
          
         # TODO: load reference data (publications, etc)
         eco_key = {}
@@ -145,74 +178,56 @@ class ETLTransformUniprot:
                 eco_key[evidence['key']] = {}
             eco_key[evidence['key']][evidence['type']] = {}
             #print(evidence)
-            nodes[self.eco_term].append({'_key': evidence['type']})
+            add_node(evidence['type'], self.eco_term)
         #print(eco_key)
         
         subcellular_location = self.get_subcellular_location(o)
         if len(subcellular_location) > 0:
             for sl in subcellular_location:
-                node_subcell = {'_key': sl[0]}
-                nodes[self.uniprot_subcell].append(node_subcell)
-                edge = self.transform_edge(sprot_node, node_subcell)
+                node_subcell = add_node(sl[0], self.uniprot_subcell)
+                edge = add_edge(node_uniprotkb, node_subcell, self.uniprot_collection_has_subcell)
                 if sl[1] in eco_key:
                     edge['eco'] = eco_key[sl[1]]
-                edges[self.uniprot_collection_has_subcell].append(edge)
                 
         catalytic_activity = self.get_catalytic_activity(o)
         if len(catalytic_activity) > 0:
             for p in catalytic_activity:
-                node_rhea = {'_key': p[0]}
-                nodes[self.rhea_collection].append(node_rhea)
-                edge = self.transform_edge(sprot_node, node_rhea)
+                node_rhea = add_node(p[0], self.rhea_collection)
+                edge = add_edge(node_uniprotkb, node_rhea, self.uniprot_collection_has_reaction_rhea)
                 if p[1] in eco_key:
                     edge['eco'] = eco_key[p[1]]
-                edges[self.uniprot_collection_has_reaction_rhea].append(edge)
                 if p[2]:
-                    node_ec = {'_key': p[2]}
-                    edges[self.uniprot_collection_has_reaction_ec].append(self.transform_edge(sprot_node, node_ec))
+                    node_ec = add_node(p[2], self.ec_collection)
+                    add_edge(node_uniprotkb, node_ec, self.uniprot_collection_has_reaction_ec)
                 
         cofactor = self.get_cofactor(o)
         if len(cofactor) > 0:
             for p in cofactor:
-                node_chebi = {'_key': p[0]}
-                nodes[self.chebi_collection].append(node_chebi)
-                edge = self.transform_edge(sprot_node, node_chebi)
+                node_chebi = add_node(p[0], self.chebi_collection)
+                edge = add_edge(node_uniprotkb, node_chebi, self.uniprot_collection_has_cofactor_chebi)
                 if p[1] in eco_key:
                     edge['eco'] = eco_key[p[1]]
-                edges[self.uniprot_collection_has_cofactor_chebi].append(edge)
-                
-        
-        for comment in o['comment']:
-            pass
             
         for ref in o['dbReference']:
             if ref['type'] == 'KEGG':
-                node_ref = {'_key': ref['id']}
-                nodes[self.kegg_gene_collection].append(node_ref)
-                edges[self.uniprot_collection_has_reference_to_kegg_gene].append(
-                    self.transform_edge(sprot_node, node_ref))
+                node_ref = add_node(ref['id'], self.kegg_gene_collection)
+                add_edge(node_uniprotkb, node_ref, self.uniprot_collection_has_reference_to_kegg_gene)
             elif ref['type'] == 'AlphaFoldDB':
-                node_ref = {'_key': ref['id']}
-                nodes[self.alphafolddb_collection].append(node_ref)
-                edges[self.uniprot_collection_has_reference_to_alphafolddb].append(
-                    self.transform_edge(sprot_node, node_ref))
+                node_ref = add_node(ref['id'], self.alphafolddb_collection)
+                add_edge(node_uniprotkb, node_ref, self.uniprot_collection_has_reference_to_alphafolddb)
             elif ref['type'] == 'EC':
-                node_ref = {'_key': ref['id']}
-                nodes[self.ec_collection].append(node_ref)
-                edges[self.uniprot_collection_has_ec].append(
-                    self.transform_edge(sprot_node, node_ref))
+                node_ref = add_node(ref['id'], self.ec_collection)
+                add_edge(node_uniprotkb, node_ref, self.uniprot_collection_has_ec)
                 
         sequence = o.get('protein_sequence', {}).get('value', '').strip()
         if len(sequence) > 0:
             h = self.seq_store_protein.store_sequence(sequence)
-            node_seq = {'_key': h, 'size': len(sequence)}
-            nodes[self.re_seq_protein_collection].append(node_seq)
-            edges[self.uniprot_collection_has_protein_sequence].append(
-                self.transform_edge(sprot_node, node_seq))
+            node_sequence = add_node(h, self.re_seq_protein_collection, {'size': len(sequence)})
+            add_edge(node_uniprotkb, node_sequence, self.uniprot_collection_has_protein_sequence)
             
         for copy_key in {'name', 'gene', 'proteinExistence', 'protein'}:
             if copy_key in o:
-                sprot_node[copy_key] = o[copy_key]
+                node_uniprotkb[copy_key] = o[copy_key]
         #print(sprot_node)
 
         return nodes, edges
