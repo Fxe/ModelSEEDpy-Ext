@@ -94,5 +94,7 @@ def load_protein_seq_store_mongo(host, database):
     s = SeqStoreMongo(mongo_client[database], 'seq_protein')
     s.CHARSET_VALIDATION = {
         'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L',
-        'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y'}
+        'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y',
+        'X'
+    }
     return s

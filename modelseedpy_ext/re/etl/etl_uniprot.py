@@ -4,9 +4,13 @@ import networkx as nx
 class Node:
 
     def __init__(self, key, label, data=None):
-        self.key = key
+        self._key = key
         self.label = label
-        self.data = data | {}
+        self.data = data if data else {}
+        
+    @property
+    def key(self):
+        return self._key.replace(' ', '_')
 
     @property
     def id(self):
@@ -125,48 +129,37 @@ class ETLTransformUniprot:
         return _edge
     
     def transform(self, o):
-        nodes = {
-            self.uniprot_collection: [],
-            self.re_seq_protein_collection: [],
-            self.uniprot_accession_collection: [],
-            self.uniprot_subcell: [],
-            self.eco_term: [],
-            self.chebi_collection: [],
-            self.rhea_collection: [],
-            self.ec_collection: [],
-            self.kegg_gene_collection: [],
-            self.alphafolddb_collection: []
-        }
-        edges = {
-            self.uniprot_collection_has_subcell: [],
-            self.uniprot_collection_has_accession: [],
-            self.uniprot_collection_has_protein_sequence: [],
-            self.uniprot_collection_has_reference_to_kegg_gene: [],
-            self.uniprot_collection_has_reference_to_alphafolddb: [],
-            self.uniprot_collection_has_cofactor_chebi: [],
-            self.uniprot_collection_has_reaction_rhea: [],
-            self.uniprot_collection_has_ec: [],
-            self.uniprot_collection_has_reaction_ec: [],
-        }
+        nodes = {}
+        edges = {}
 
         def add_node(node_id, label, data=None):
+            if label not in nodes:
+                nodes[label] = {}
             if label in nodes:
                 _node = self.build_node(node_id, label, data)
-                nodes[label].append(_node)
-                return _node
-
+                if _node.id not in nodes[label]:
+                    nodes[label][_node.id] = _node
+                else:
+                    #print('dup', _node.id)
+                    pass
+                    
+                return nodes[label][_node.id]
+            print('error')
             return None
 
         def add_edge(node_from, node_to, label, data=None):
+            if label not in edges:
+                edges[label] = []
             if label in edges:
                 _edge = self.transform_edge(node_from, node_to, data)
                 edges[label].append(_edge)
                 return _edge
-
+            print('error')
             return None
 
-        node_uniprotkb = self.build_node('_'.join(sorted(o['accession'])), self.uniprot_collection)
-        nodes[self.uniprot_collection].append(node_uniprotkb)
+        node_uniprotkb = add_node('_'.join(sorted(o['accession'])), self.uniprot_collection)
+        
+        #nodes[self.uniprot_collection].append(node_uniprotkb)
         for i in o['accession']:
             node_accession = add_node(i, self.uniprot_accession_collection)
             add_edge(node_uniprotkb, node_accession, self.uniprot_collection_has_accession)
@@ -219,15 +212,21 @@ class ETLTransformUniprot:
                 node_ref = add_node(ref['id'], self.ec_collection)
                 add_edge(node_uniprotkb, node_ref, self.uniprot_collection_has_ec)
                 
-        sequence = o.get('protein_sequence', {}).get('value', '').strip()
+        try:
+            sequence = o.get('protein_sequence', {}).get('value', '')
+            if sequence:
+                sequence = sequence.strip()
+        except Exception as e:
+            print(o)
+            raise Exception('!!')
         if len(sequence) > 0:
             h = self.seq_store_protein.store_sequence(sequence)
             node_sequence = add_node(h, self.re_seq_protein_collection, {'size': len(sequence)})
             add_edge(node_uniprotkb, node_sequence, self.uniprot_collection_has_protein_sequence)
             
-        for copy_key in {'name', 'gene', 'proteinExistence', 'protein'}:
+        for copy_key in {'name', 'gene', 'proteinExistence', 'protein', 'comment'}:
             if copy_key in o:
-                node_uniprotkb[copy_key] = o[copy_key]
+                node_uniprotkb.data[copy_key] = o[copy_key]
         #print(sprot_node)
 
         return nodes, edges
