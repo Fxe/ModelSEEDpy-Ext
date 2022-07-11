@@ -1,13 +1,16 @@
 import pandas as pd
 
+
 def test_core_template(template, media_file):
     medias = load_medias(media_file)
     model_core = build_full_model(template)
     test_core_model(model_core, medias)
 
+
 def load_medias(filep):
     medias = pd.read_csv(filep, sep='\t', index_col=0).to_dict()
     return medias
+
 
 def build_full_model(template):
     from modelseedpy import MSBuilder
@@ -28,6 +31,7 @@ def build_full_model(template):
     model.objective = 'bio2'
     return model
 
+
 def test_media(model, media, exs, comp):
     medium_ = {}
     for k in media:
@@ -42,6 +46,7 @@ def test_media(model, media, exs, comp):
     model.medium = medium_
     sol = model.optimize()
     return sol
+
 
 def test_core_model(model_core, medias, v=True):
     res = {}
@@ -69,3 +74,16 @@ def test_core_model(model_core, medias, v=True):
                 print(media_id, 0)
             res[media_id] = 0
     return res, media_out
+
+
+def xml_print(l_start, l_end, filename, line=True):
+    l_read = 0
+    with open(filename, 'rb') as fh:
+        while l_read < l_end:
+            l = fh.readline()
+            if l_read >= l_start:
+                if line:
+                    print(f'[{l_read}]{l.decode("utf-8")[:-1]}')
+                else:
+                    print(f'{l.decode("utf-8")[:-1]}')
+            l_read += 1
