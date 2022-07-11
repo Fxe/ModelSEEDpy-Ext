@@ -1,4 +1,8 @@
+import logging
 import lxml.etree as ET
+
+logging.getLogger(__name__)
+
 
 class UnirefParser:
     

@@ -1,6 +1,7 @@
 import hashlib
 import modelseedpy
 
+
 class RE:
     
     def __init__(self, db, kbase_api, eutils_api, dna_store, protein_store):
@@ -106,6 +107,19 @@ class RE:
         hash_genome = load_genome_from_fna_file(handle_ref, ' ')
 
         return hash_genome
+
+    def load_mash_scores(self, docs):
+        aql_upsert = """
+        FOR d IN @docs
+            UPSERT { _key: d._key}
+            INSERT { _key: d._key, _to: d._to, _from: d._from, score: d.score, _created_at: DATE_NOW(), _updated_at: DATE_NOW()}
+            UPDATE { score: d.score, _updated_at: DATE_NOW()} IN @@col
+        """
+        bin_vars = {
+            'docs': docs,
+            '@col': 're_contig_set_mash_score'
+        }
+        self.db.AQLQuery(aql_upsert, bindVars=bin_vars)
 
     def load_genome_from_fna_file(self, path, split=' '):
         genome = modelseedpy.core.MSGenome.from_fasta(path, split=split)
