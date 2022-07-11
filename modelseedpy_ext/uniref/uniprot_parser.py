@@ -34,6 +34,9 @@ class Wut:
         for action, elem in parser:
             tag = elem.tag
             if action == 'end' and tag == self.ns + tag_end:
+                # sometimes text is captured at the end tag !?
+                if elem.text:
+                    res['value'] = elem.text
                 return res
             else:
                 if self.verbose:
@@ -530,6 +533,7 @@ class SwissProtParser:
                 if self.tag_capture[x][1] and self.tag_capture[x][1] == list:
                     uniprot_entry[x] = []
                          
+        prev_text = None
         for action, elem in parser:
             tag = elem.tag
             
@@ -547,13 +551,17 @@ class SwissProtParser:
                 }
                 uniprot_entry['protein_sequence'].update(elem.attrib)
             elif action == 'end' and tag == self.tag_sequence:
-                pass
+                if uniprot_entry['protein_sequence']['value'] is None:
+                    uniprot_entry['protein_sequence']['value'] = elem.text
             elif action == 'end' and tag == self.tag_entry:
                 return uniprot_entry
             elif action == 'start' and tag == self.tag_accession:
-                uniprot_entry['accession'].append(elem.text)
+                prev_text = elem.text
+                if elem.text:
+                    uniprot_entry['accession'].append(elem.text)
             elif action == 'end' and tag == self.tag_accession:
-                pass
+                if prev_text is None and elem.text:
+                    uniprot_entry['accession'].append(elem.text)
             elif action == 'start' and tag == self.tag_name:
                 uniprot_entry['name'].append(elem.text)
             elif action == 'end' and tag == self.tag_name:

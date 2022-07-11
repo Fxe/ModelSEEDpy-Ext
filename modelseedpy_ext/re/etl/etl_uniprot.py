@@ -1,4 +1,7 @@
+import logging
 import networkx as nx
+
+logger = logging.getLogger(__name__)
 
 
 class Node:
@@ -49,10 +52,8 @@ class ETLTransformUniprot:
     def get_cofactor(o):
         res = []
         for comment in o['comment']:
-            if comment['type'] == 'cofactor':
-                if len(comment['cofactor']) == 1:
-
-                    cofactor = comment['cofactor'][0]
+            if comment['type'] == 'cofactor' and 'cofactor' in comment:
+                for cofactor in comment['cofactor']:
                     cofactor_compound = [None, cofactor.get('evidence')]
                     for db_ref in cofactor.get('dbReference', []):
                         if db_ref['type'] == 'ChEBI':
@@ -61,8 +62,6 @@ class ETLTransformUniprot:
                             print('get_cofactor ignore', db_ref['type'])
                     if cofactor_compound[0]:
                         res.append(cofactor_compound)
-                else:
-                    print('error', o['accession'])
         return res
         
     @staticmethod
@@ -95,9 +94,12 @@ class ETLTransformUniprot:
         for comment in o['comment']:
             if comment['type'] == 'subcellular location':
                 sl = comment.get('subcellularLocation')
-                for locations in sl:
-                    for location in locations['location']:
-                        comment_location.append([location['value'], location.get('evidence'), None])
+                if sl:
+                    for locations in sl:
+                        for location in locations['location']:
+                            comment_location.append([location['value'], location.get('evidence'), None])
+                else:
+                    logger.error(f"get_subcellular_location [{o['xml_sourceline']}]")
                         
         return comment_location
                         
@@ -212,13 +214,7 @@ class ETLTransformUniprot:
                 node_ref = add_node(ref['id'], self.ec_collection)
                 add_edge(node_uniprotkb, node_ref, self.uniprot_collection_has_ec)
                 
-        try:
-            sequence = o.get('protein_sequence', {}).get('value', '')
-            if sequence:
-                sequence = sequence.strip()
-        except Exception as e:
-            print(o)
-            raise Exception('!!')
+        sequence = o.get('protein_sequence', {}).get('value', '').strip()
         if len(sequence) > 0:
             h = self.seq_store_protein.store_sequence(sequence)
             node_sequence = add_node(h, self.re_seq_protein_collection, {'size': len(sequence)})

@@ -95,6 +95,11 @@ def load_protein_seq_store_mongo(host, database):
     s.CHARSET_VALIDATION = {
         'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L',
         'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y',
-        'X'
+        'O',  # Pyrrolysine
+        'U',  # Selenocysteine
+        'B',  # Aspartate or Asparagine
+        'Z',  # Glutamate or Glutamine
+        'J',  # Leucine or Isoleucine
+        'X'   # Any
     }
     return s
