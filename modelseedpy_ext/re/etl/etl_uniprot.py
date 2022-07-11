@@ -1,28 +1,17 @@
 import logging
 import networkx as nx
+from modelseedpy_ext.re.etl.etl_transform_graph import ETLTransformGraph
 
 logger = logging.getLogger(__name__)
 
 
-class Node:
-
-    def __init__(self, key, label, data=None):
-        self._key = key
-        self.label = label
-        self.data = data if data else {}
-        
-    @property
-    def key(self):
-        return self._key.replace(' ', '_')
-
-    @property
-    def id(self):
-        return f'{self.label}/{self.key}'
 
 
-class ETLTransformUniprot:
+
+class ETLTransformUniprot(ETLTransformGraph):
     
     def __init__(self, seq_store_protein):
+        super().__init__()
         self.seq_store_protein = seq_store_protein
         self.uniprot_collection = 'uniprotkb_sprot'
         self.uniprot_accession_collection = 'uniprotkb_accession'
@@ -43,10 +32,6 @@ class ETLTransformUniprot:
         self.uniprot_collection_has_cofactor_chebi = 'uniprotkb_sprot_has_cofactor_chebi_term'
         self.uniprot_collection_has_reaction_rhea = 'uniprotkb_sprot_has_catalytic_activity_rhea_reaction'
         self.uniprot_collection_has_reaction_ec = 'uniprotkb_has_catalytic_activity_ec_number'
-
-    @staticmethod
-    def build_node(node_id, label, data=None):
-        return Node(node_id, label, data)
         
     @staticmethod
     def get_cofactor(o):
@@ -118,18 +103,7 @@ class ETLTransformUniprot:
                     comment_location.append(location)
                     
         return comment_location
-    
-    @staticmethod
-    def transform_edge(src: Node, dst: Node, data=None):
-        _edge = {
-            '_key': '{}:{}'.format(src.key, dst.key),
-            '_from': src,
-            '_to': dst,
-        }
-        if data:
-            _edge.update(data)
-        return _edge
-    
+
     def transform(self, o):
         nodes = {}
         edges = {}
