@@ -10,7 +10,7 @@ class ETLTransformUniprot(ETLTransformGraph):
     def __init__(self, seq_store_protein, uniprot_type='sprot'):
         super().__init__()
         self.seq_store_protein = seq_store_protein
-        self.uniprot_collection = 'uniprotkb_sprot'
+        self.uniprot_collection = f'uniprotkb_{uniprot_type}'
         self.uniprot_accession_collection = 'uniprotkb_accession'
         self.uniprot_subcell = 'uniprotkb_subcell'
         self.eco_term = 'eco_term'
@@ -194,6 +194,5 @@ class ETLTransformUniprot(ETLTransformGraph):
         for copy_key in {'name', 'gene', 'proteinExistence', 'protein', 'comment'}:
             if copy_key in o:
                 node_uniprotkb.data[copy_key] = o[copy_key]
-        #print(sprot_node)
 
         return nodes, edges
