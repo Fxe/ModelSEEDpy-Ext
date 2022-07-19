@@ -29,7 +29,8 @@ class ETLLoadArangoDb:
             # print(collection_id)
             keys = set()
             to_load = []
-            for node in nodes[collection_id]:
+            for node_id in nodes[collection_id]:
+                node = nodes[collection_id][node_id]
                 node_copy = copy.deepcopy(node.data)
                 if len(node.key) > 120:
                     h = hashlib.sha256(node.key.encode('utf-8')).hexdigest()

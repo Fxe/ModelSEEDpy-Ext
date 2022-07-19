@@ -60,3 +60,5 @@ class ETLTransformContigSet(ETLTransformGraph):
         node_contig_set = add_node(hash_contig_set, 're_contig_set', {})
         for node in nodes['re_contig'].values():
             add_edge(node_contig_set, node, 're_contig_set_has_contig', {})
+            
+        return nodes, edges
