@@ -5,12 +5,9 @@ from modelseedpy_ext.re.etl.etl_transform_graph import ETLTransformGraph
 logger = logging.getLogger(__name__)
 
 
-
-
-
 class ETLTransformUniprot(ETLTransformGraph):
     
-    def __init__(self, seq_store_protein):
+    def __init__(self, seq_store_protein, uniprot_type='sprot'):
         super().__init__()
         self.seq_store_protein = seq_store_protein
         self.uniprot_collection = 'uniprotkb_sprot'
@@ -23,15 +20,15 @@ class ETLTransformUniprot(ETLTransformGraph):
         self.re_seq_protein_collection = 're_seq_protein'
         self.kegg_gene_collection = 'kegg_gene'
         self.alphafolddb_collection = 'alphafolddb'
-        self.uniprot_collection_has_ec = 'uniprotkb_sprot_has_ec'
-        self.uniprot_collection_has_subcell = 'uniprotkb_sprot_has_subcell'
-        self.uniprot_collection_has_accession = 'uniprotkb_sprot_has_accession'
-        self.uniprot_collection_has_protein_sequence = 'uniprotkb_sprot_has_protein_sequence'
-        self.uniprot_collection_has_reference_to_kegg_gene = 'uniprotkb_sprot_has_reference_to_kegg_gene'
-        self.uniprot_collection_has_reference_to_alphafolddb = 'uniprotkb_sprot_has_reference_to_alphafolddb'
-        self.uniprot_collection_has_cofactor_chebi = 'uniprotkb_sprot_has_cofactor_chebi_term'
-        self.uniprot_collection_has_reaction_rhea = 'uniprotkb_sprot_has_catalytic_activity_rhea_reaction'
-        self.uniprot_collection_has_reaction_ec = 'uniprotkb_has_catalytic_activity_ec_number'
+        self.uniprot_collection_has_ec = f'uniprotkb_{uniprot_type}_has_ec'
+        self.uniprot_collection_has_subcell = f'uniprotkb_{uniprot_type}_has_subcell'
+        self.uniprot_collection_has_accession = f'uniprotkb_{uniprot_type}_has_accession'
+        self.uniprot_collection_has_protein_sequence = f'uniprotkb_{uniprot_type}_has_protein_sequence'
+        self.uniprot_collection_has_reference_to_kegg_gene = f'uniprotkb_{uniprot_type}_has_reference_to_kegg_gene'
+        self.uniprot_collection_has_reference_to_alphafolddb = f'uniprotkb_{uniprot_type}_has_reference_to_alphafolddb'
+        self.uniprot_collection_has_cofactor_chebi = f'uniprotkb_{uniprot_type}_has_cofactor_chebi_term'
+        self.uniprot_collection_has_reaction_rhea = f'uniprotkb_{uniprot_type}_has_catalytic_activity_rhea_reaction'
+        self.uniprot_collection_has_reaction_ec = f'uniprotkb_{uniprot_type}_has_catalytic_activity_ec_number'
         
     @staticmethod
     def get_cofactor(o):

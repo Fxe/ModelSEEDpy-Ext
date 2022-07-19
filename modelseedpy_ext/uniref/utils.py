@@ -13,22 +13,22 @@ FOOTER = "</uniprot>"
 def split_into_blocks(uniprot_file, output_folder, l_block_size=2500, l_max=None, h=HEADER, f=FOOTER):
     i = 0
     with open(uniprot_file, 'r') as fh:
-        l = fh.readline()
+        line = fh.readline()
         xml_record = None
         block_index = 0
         written = 0
         fh_write = open(f'{output_folder}/block_{block_index}_{l_block_size}.xml', 'w')
         if h:
             fh_write.write(h)
-        while (l):
-            l = fh.readline()
+        while line:
+            line = fh.readline()
             i += 1
 
-            if '<entry dataset' in l and xml_record is None:
+            if '<entry dataset' in line and xml_record is None:
                 xml_record = ""
-                xml_record += l
-            elif '</entry' in l:
-                xml_record += l
+                xml_record += line
+            elif '</entry' in line:
+                xml_record += line
                 fh_write.write(xml_record)
                 xml_record = None
                 written += 1
@@ -43,7 +43,7 @@ def split_into_blocks(uniprot_file, output_folder, l_block_size=2500, l_max=None
                         fh_write.write(h)
             else:
                 if xml_record:
-                    xml_record += l
+                    xml_record += line
 
             if l_max and i > l_max:
                 logger.warning('max lines exceeded term')
