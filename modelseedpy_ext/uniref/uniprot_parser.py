@@ -1,5 +1,7 @@
+import logging
 import lxml.etree as ET
 
+logging.getLogger(__name__)
 
 
 class Wut:
@@ -52,7 +54,8 @@ class Wut:
             else:
                 if self.verbose:
                     print(f'[no capture] {self.tag}', action, tag, elem.attrib, elem.text)
-                    
+
+
 class CaptureDbReference(Wut):
     
     def parse(self, elem, parser):
@@ -73,7 +76,8 @@ class CaptureDbReference(Wut):
             else:
                 if self.verbose:
                     print(f'[no capture] [tag:{self.tag}]', action, tag, elem.attrib, elem.text, elem.sourceline)
-                    
+
+
 class CaptureEvidence(Wut):
     
     def parse_source(self, elem, parser):
@@ -105,10 +109,12 @@ class CaptureEvidence(Wut):
             else:
                 if self.verbose:
                     print(f'[no capture] {self.tag}', action, tag, elem.attrib, elem.text)
-                    
+
+
 class CaptureDbReferenceType(Wut):
     
     pass
+
 
 class CaptureProtein(Wut):
     
@@ -174,7 +180,8 @@ class CaptureProtein(Wut):
             else:
                 if self.verbose:
                     print(f'[no capture] {self.tag}', action, tag, elem.attrib, elem.text)
-                    
+
+
 class CaptureComment(Wut):
     
     def parse_isoform(self, elem, parser):
@@ -439,7 +446,8 @@ class CaptureComment(Wut):
             else:
                 if self.verbose:
                     print(f'[no capture] {self.tag}', action, tag, elem.attrib, elem.text, elem.sourceline)
-                    
+
+
 class CaptureGene(Wut):
     
     def parse(self, elem, parser):
@@ -459,10 +467,17 @@ class CaptureGene(Wut):
             else:
                 if self.verbose:
                     print(f'[no capture] {self.tag}', action, tag, elem.attrib, elem.text)
-                    
+
+
 class SwissProtParser:
     
-    def __init__(self):
+    def __init__(self, parse_limit=None):
+        """
+
+        :param parse_limit: max number of entries
+        """
+        self.max_entries = parse_limit
+
         self.tag_entry = 'entry'
         self.tag_accession = 'accession'
         self.tag_name = 'name'

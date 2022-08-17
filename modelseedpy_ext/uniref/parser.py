@@ -6,7 +6,13 @@ logging.getLogger(__name__)
 
 class UnirefParser:
     
-    def __init__(self):
+    def __init__(self, parse_limit=None):
+        """
+
+        :param parse_limit: max number of entries
+        """
+        self.max_entries = parse_limit
+
         self.tag_entry = 'entry'
         self.tag_property = 'property'
         self.tag_sequence = 'sequence'
@@ -26,19 +32,18 @@ class UnirefParser:
         self.tag_name = ns + self.tag_name
     
     def parse(self, fh):
-        entries = {}
+        yielded = 0
         parser = ET.iterparse(fh, events=('end', 'start'))
         for action, elem in parser:
             tag = elem.tag
             #print(action, tag)
             if action == 'start' and tag == self.tag_entry:
-                uniref_entry = self.parse_entry(elem, parser)
-                entries[uniref_entry['id']] = uniref_entry
+                yield self.parse_entry(elem, parser)
+                yielded += 1
             else:
                 print('parse', action, elem)
-            if self.max_entries and len(entries) >= self.max_entries:
+            if self.max_entries and yielded >= self.max_entries:
                 break
-        return entries
     
     def parse_sequence(self, elem, parser):
         sequence = dict(elem.attrib)

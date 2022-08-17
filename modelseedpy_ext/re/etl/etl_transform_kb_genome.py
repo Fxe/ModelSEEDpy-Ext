@@ -3,6 +3,9 @@ import logging
 from Bio.Seq import Seq
 from modelseedpy_ext.re.etl.etl_transform_graph import ETLTransformGraph
 
+logger = logging.getLogger(__name__)
+
+
 def locate_feature_dna_sequence_in_contig(f, contigs):
     ll = []
     for l in f.data['location']:
@@ -31,9 +34,11 @@ def locate_feature_dna_sequence_in_contig(f, contigs):
             print('contig not found:', contig_id)
     return ll
 
+
 class ETLTransformKBaseGenome(ETLTransformGraph):
-    
+
     def __init__(self, dna_store, protein_store):
+        super().__init__()
         self.dna_store = dna_store
         self.protein_store = protein_store
     
@@ -73,23 +78,54 @@ class ETLTransformKBaseGenome(ETLTransformGraph):
         for contig in contigs.features:
             _contigs[contig.id] = [contig.seq, str(Seq(contig.seq).complement())]
             _contigs_hash[contig.id] = self.dna_store.store_sequence(contig.seq)
-        
-        
+
         print(len(_contigs))
         print(_contigs_hash)
-        
+
+        node_ws_genome_object = None
+        if kb_genome.info:
+
+            key = str(kb_genome.info).replace('/', ':')
+            node_ws_genome_object = add_node(key, 'ws_object_version', data={
+                'workspace_id': kb_genome.info.workspace_uid,
+                'object_id': kb_genome.info.uid,
+                'version': kb_genome.info.version,
+                'name': kb_genome.info.id
+            })
+
+        seq_dna_hashes = []
+        seq_protein_hashes = []
         for f in kb_genome.features:
             seq_dna = f.dna_sequence
             seq_protein = f.protein_translation
             h_dna = self.dna_store.store_sequence(seq_dna)
             h_protein = self.protein_store.store_sequence(seq_protein)
+            seq_dna_hashes.append(h_dna)
+            seq_protein_hashes.append(h_protein)
+
             node_seq_dna = add_node(h_dna, 're_seq_dna', data=None)
             node_seq_protein = add_node(h_protein, 're_seq_protein', data=None)
+
+            if node_ws_genome_object:
+                add_edge(node_ws_genome_object, node_seq_dna, 'ws_genome_has_seq_dna')
+                add_edge(node_ws_genome_object, node_seq_protein, 'ws_genome_has_seq_protein')
             
             seq_translation = str(Seq(seq_dna).translate())[:-1]
             if seq_translation == seq_protein:
                 add_edge(node_seq_dna, node_seq_protein, 're_seq_dna_has_translation')
             else:
                 add_edge(node_seq_dna, node_seq_protein, 're_seq_dna_has_partial_translation')
+
+        hash_dna_set = hashlib.sha256('_'.join(sorted(seq_dna_hashes)).encode('utf-8')).hexdigest()
+        hash_protein_set = hashlib.sha256('_'.join(sorted(seq_protein_hashes)).encode('utf-8')).hexdigest()
+
+        print(hash_dna_set)
+        print(hash_protein_set)
+
+        node_seq_dna_set = add_node(hash_dna_set, 're_seq_dna_set', data=None)
+        node_seq_protein_set = add_node(hash_protein_set, 're_seq_protein_set', data=None)
+
+        add_edge(node_ws_genome_object, node_seq_dna_set, 'ws_genome_has_seq_dna_set')
+        add_edge(node_ws_genome_object, node_seq_protein_set, 'ws_genome_has_seq_protein_set')
         
         return nodes, edges
