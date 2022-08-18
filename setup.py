@@ -10,6 +10,7 @@ setup(name='modelseedpy_ext',
       packages=find_packages(),
       install_requires=[
           # "modelseedpy >= 1.0.0", # when available in pypi
+          "requests",
           "pandas >= 1.0.0",
           "networkx >= 2.4",
           "cobra >= 0.17.1"

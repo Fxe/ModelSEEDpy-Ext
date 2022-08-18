@@ -20,7 +20,6 @@ class UnirefParser:
         self.tag_representative_member = 'representativeMember'
         self.tag_member = 'member'
         self.tag_name = 'name'
-        self.max_entries = None
     
     def set_xml_ns(self, ns):
         self.tag_entry = ns + self.tag_entry

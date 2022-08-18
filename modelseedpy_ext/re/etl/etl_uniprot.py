@@ -196,3 +196,88 @@ class ETLTransformUniprot(ETLTransformGraph):
                 node_uniprotkb.data[copy_key] = o[copy_key]
 
         return nodes, edges
+
+
+class ETLTransformUniprot2(ETLTransformGraph):
+    """
+    This mimics ETLTransformUniprot for the API extract instead of xml dump
+    """
+
+    def __init__(self, seq_store_protein):
+        super().__init__()
+        self.seq_store_protein = seq_store_protein
+
+        self.re_seq_protein_collection = 're_seq_protein'
+        self.uniprot_accession_collection = 'uniprotkb_accession'
+
+    def transform(self, entry):
+        nodes = {}
+        edges = {}
+
+        def add_node(node_id, label, data=None):
+            if label not in nodes:
+                nodes[label] = {}
+            if label in nodes:
+                _node = self.build_node(node_id, label, data)
+                if _node.id not in nodes[label]:
+                    nodes[label][_node.id] = _node
+                else:
+                    # print('dup', _node.id)
+                    pass
+
+                return nodes[label][_node.id]
+
+            logger.error('add_node error')
+            return None
+
+        def add_edge(node_from, node_to, label, data=None):
+            if label not in edges:
+                edges[label] = []
+            if label in edges:
+                _edge = self.transform_edge(node_from, node_to, data)
+                edges[label].append(_edge)
+                return _edge
+
+            logger.error('add_edge error')
+            return None
+
+        uniprot_type = None
+        if entry['entryType'] == 'UniProtKB reviewed (Swiss-Prot)':
+            uniprot_type = 'sprot'
+        elif entry['entryType'] == 'UniProtKB unreviewed (TrEMBL)':
+            uniprot_type = 'trembl'
+
+        if uniprot_type is None:
+            raise Exception('unable to type: ' + entry['entryType'])
+        uniprot_collection = f'uniprotkb_{uniprot_type}'
+        uniprot_collection_has_protein_sequence = f'uniprotkb_{uniprot_type}_has_protein_sequence'
+        uniprot_collection_has_accession = f'uniprotkb_{uniprot_type}_has_accession'
+
+        accession_ids = [entry['primaryAccession']]
+        if 'secondaryAccessions' in entry:
+            accession_ids += entry['secondaryAccessions']
+
+        node_uniprotkb = add_node('_'.join(sorted(accession_ids)), uniprot_collection)
+
+        for i in accession_ids:
+            node_accession = add_node(i, self.uniprot_accession_collection)
+            add_edge(node_uniprotkb, node_accession, uniprot_collection_has_accession)
+
+        if 'genes' in entry:
+            node_uniprotkb.data['gene'] = entry['genes']
+        if 'proteinExistence' in entry:
+            node_uniprotkb.data['proteinExistence'] = entry['proteinExistence']
+        if 'proteinDescription' in entry:
+            node_uniprotkb.data['protein'] = entry['proteinDescription']
+        if 'uniProtkbId' in entry:
+            node_uniprotkb.data['name'] = [entry['uniProtkbId']]
+        if 'comments' in entry:
+            node_uniprotkb.data['comment'] = [entry['comments']]
+
+        if 'sequence' in entry and 'value' in entry['sequence']:
+            sequence = entry['sequence']['value']
+            h = self.seq_store_protein.store_sequence(sequence)
+            node_sequence = add_node(h, self.re_seq_protein_collection, {'size': len(sequence)})
+            add_edge(node_uniprotkb, node_sequence, uniprot_collection_has_protein_sequence)
+
+        return nodes, edges
