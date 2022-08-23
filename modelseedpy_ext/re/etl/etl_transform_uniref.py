@@ -79,7 +79,7 @@ class ETLTransformUniref(ETLTransformGraph):
             data = fetch_uniparc[uniparc_id]
             if 'hash' not in data:
                 i = uniparc_id.split('/')[-1]
-                print('load uniparc', i)
+                logger.warning(f'load uniparc: {i}')
                 nodes, edges = self.etl_transform_uniparc.transform(self.etl_extract_uniparc.extract(i))
                 self.etl_load.load({
                     'nodes': nodes,
@@ -143,6 +143,7 @@ class ETLTransformUniref(ETLTransformGraph):
             if len(sequences) == 1:
                 fetch_uniprot[acc]['hash'] = sequences[0]
             else:
+                logger.warning(f'load uniprot: {acc}')
                 nodes, edges = self.etl_transform_uniprot.transform(
                     self.etl_extract_uniprot.extract(acc.split('/')[-1]))
                 self.etl_load.load({
@@ -231,36 +232,42 @@ class ETLTransformUniref(ETLTransformGraph):
             'GO Cellular Component': r.get('GO Cellular Component', [])
         })
 
+
+
         fetch_uniprot = {}
         fetch_uniparc = {}
+
+        def process_members(db_ref, base_type='member'):
+            member_type = {base_type}
+            if 'isSeed' in db_ref and db_ref['isSeed'][0] == 'true':
+                member_type.add('seed')
+            if db_ref['type'] == 'UniProtKB ID':
+                fetch_uniprot['uniprotkb_accession/' + db_ref['UniProtKB accession'][0]] = {
+                    'expected_len': int(db_ref['length'][0]),
+                    'member_type': member_type,
+                    'db_reference': db_ref
+                }
+            elif db_ref['type'] == 'UniParc ID':
+                fetch_uniparc['uniparc/' + db_ref['id']] = {
+                    'expected_len': int(db_ref['length'][0]),
+                    'member_type': member_type,
+                    'db_reference': db_ref
+                }
+            else:
+                logger.warning('not sure what to do:' + db_ref['type'])
+
         for o in r['members']:
             for db_ref in o['db_reference']:
-                member_type = 'member'
-                if 'isSeed' in db_ref and db_ref['isSeed'][0] == 'true':
-                    member_type = 'seed'
-                if db_ref['type'] == 'UniProtKB ID':
-                    fetch_uniprot['uniprotkb_accession/' + db_ref['UniProtKB accession'][0]] = {
-                        'expected_len': int(db_ref['length'][0]),
-                        'member_type': member_type,
-                        'db_reference': db_ref
-                    }
+                process_members(db_ref, base_type='member')
 
-                elif db_ref['type'] == 'UniParc ID':
-                    fetch_uniparc['uniparc/' + db_ref['id']] = {
-                        'expected_len': int(db_ref['length'][0]),
-                        'member_type': member_type,
-                        'db_reference': db_ref
-                    }
-                else:
-                    logger.warning('not sure what to do:' + db_ref['type'])
+        for o in r['representative_members']:
+            for db_ref in o['db_reference']:
+                process_members(db_ref, base_type='representative')
 
-        fetch_uniparc = self.get_uniparc_hash(fetch_uniparc, nodes)
-        fetch_uniprot = self.get_uniprot_hash(fetch_uniprot, nodes)
-
-        node_links = {}
-
-        for representative_member in r['representative_members']:
+            """
+            # old stuff sequence will now be ignored from representative member and always fetch from db_ref
             sequence = representative_member['sequence']['value']
+
             protein_hash = self.protein_store.store_sequence(sequence)
             node_sequence = self.add_node(protein_hash, self.re_seq_protein_collection, nodes, {'size': len(sequence)})
             if node_sequence.id not in node_links:
@@ -270,6 +277,14 @@ class ETLTransformUniref(ETLTransformGraph):
                 node_links[node_sequence.id]['reference'].append(ref)
                 if 'isSeed' in ref and ref['isSeed'][0] == 'true':
                     node_links[node_sequence.id]['type'].add('seed')
+            """
+
+        fetch_uniparc = self.get_uniparc_hash(fetch_uniparc, nodes)
+        fetch_uniprot = self.get_uniprot_hash(fetch_uniprot, nodes)
+
+        node_links = {}
+
+
             # add_edge(node_uniprotkb, node_sequence, self.uniprot_collection_has_protein_sequence)
 
         for uniprotkb in fetch_uniprot:
@@ -277,7 +292,7 @@ class ETLTransformUniref(ETLTransformGraph):
             if 'hash' in o:
                 if o['hash'] not in node_links:
                     node_links[o['hash']] = {'type': set(), 'reference': []}
-                node_links[o['hash']]['type'].add(o['member_type'])
+                node_links[o['hash']]['type']+= o['member_type']
                 node_links[o['hash']]['reference'].append(o)
                 node_links[o['hash']]['node'] = o['node']
             else:
@@ -287,7 +302,7 @@ class ETLTransformUniref(ETLTransformGraph):
             if 'hash' in o:
                 if o['hash'] not in node_links:
                     node_links[o['hash']] = {'type': set(), 'reference': []}
-                node_links[o['hash']]['type'].add(o['member_type'])
+                node_links[o['hash']]['type']+= o['member_type']
                 node_links[o['hash']]['reference'].append(o)
                 node_links[o['hash']]['node'] = o['node']
             else:
