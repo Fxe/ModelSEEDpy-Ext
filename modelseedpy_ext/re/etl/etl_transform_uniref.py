@@ -292,7 +292,7 @@ class ETLTransformUniref(ETLTransformGraph):
             if 'hash' in o:
                 if o['hash'] not in node_links:
                     node_links[o['hash']] = {'type': set(), 'reference': []}
-                node_links[o['hash']]['type']+= o['member_type']
+                node_links[o['hash']]['type'].update(o['member_type'])
                 node_links[o['hash']]['reference'].append(o)
                 node_links[o['hash']]['node'] = o['node']
             else:
@@ -302,7 +302,7 @@ class ETLTransformUniref(ETLTransformGraph):
             if 'hash' in o:
                 if o['hash'] not in node_links:
                     node_links[o['hash']] = {'type': set(), 'reference': []}
-                node_links[o['hash']]['type']+= o['member_type']
+                node_links[o['hash']]['type'].update(o['member_type'])
                 node_links[o['hash']]['reference'].append(o)
                 node_links[o['hash']]['node'] = o['node']
             else:
