@@ -246,6 +246,8 @@ class ETLTransformUniprot2(ETLTransformGraph):
             uniprot_type = 'sprot'
         elif entry['entryType'] == 'UniProtKB unreviewed (TrEMBL)':
             uniprot_type = 'trembl'
+        elif entry['entryType'] == 'Inactive':
+            raise ValueError(f'inactive record: {entry}')
 
         if uniprot_type is None:
             raise Exception('unable to type: ' + entry['entryType'])

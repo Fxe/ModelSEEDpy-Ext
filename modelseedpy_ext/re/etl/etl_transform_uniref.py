@@ -103,10 +103,11 @@ class ETLTransformUniref(ETLTransformGraph):
 
         return fetch_uniparc
 
-    def get_uniprot_hash(self, fetch_uniprot, nodes, fetch_missing=False):
+    def get_uniprot_hash(self, fetch_uniprot, fetch_uniparc, nodes, fetch_missing=False):
         query = self.database.AQLQuery(self.aql_uniprot, bindVars={'acc_list': list(fetch_uniprot)}, rawResults=True)
         prot_seq = {}
         reload = False
+
         for k in query:
             acc = k['acc']
             expected_len = fetch_uniprot[acc]['expected_len']
@@ -143,14 +144,24 @@ class ETLTransformUniref(ETLTransformGraph):
             if len(sequences) == 1:
                 fetch_uniprot[acc]['hash'] = sequences[0]
             else:
-                logger.warning(f'load uniprot: {acc}')
-                nodes, edges = self.etl_transform_uniprot.transform(
-                    self.etl_extract_uniprot.extract(acc.split('/')[-1]))
-                self.etl_load.load({
-                    'nodes': nodes,
-                    'edges': edges
-                })
-                reload = True
+                try:
+                    logger.warning(f'load uniprot: {acc}')
+                    nodes, edges = self.etl_transform_uniprot.transform(
+                        self.etl_extract_uniprot.extract(acc.split('/')[-1]))
+                    self.etl_load.load({
+                        'nodes': nodes,
+                        'edges': edges
+                    })
+                    reload = True
+                except ValueError:
+                    logger.warning(f'unable to etl uniprot: {acc}, switching to uniparc id')
+                    if 'UniParc ID' in fetch_uniprot[acc]['db_reference']:
+                        uniparc_id = fetch_uniprot[acc]['db_reference']['UniParc ID'][0]
+                        fetch_uniparc[f'uniparc/{uniparc_id}'] = fetch_uniprot[acc]
+                        del fetch_uniprot[acc]
+                    else:
+                        raise Exception(f'unable to resolve reference: {fetch_uniprot[acc]}')
+
         if reload:
             logger.warning('reload after new data')
             query = self.database.AQLQuery(self.aql_uniprot, bindVars={'acc_list': list(fetch_uniprot)},
@@ -232,8 +243,6 @@ class ETLTransformUniref(ETLTransformGraph):
             'GO Cellular Component': r.get('GO Cellular Component', [])
         })
 
-
-
         fetch_uniprot = {}
         fetch_uniparc = {}
 
@@ -279,13 +288,12 @@ class ETLTransformUniref(ETLTransformGraph):
                     node_links[node_sequence.id]['type'].add('seed')
             """
 
+        fetch_uniprot = self.get_uniprot_hash(fetch_uniprot, fetch_uniparc, nodes)
         fetch_uniparc = self.get_uniparc_hash(fetch_uniparc, nodes)
-        fetch_uniprot = self.get_uniprot_hash(fetch_uniprot, nodes)
 
         node_links = {}
 
-
-            # add_edge(node_uniprotkb, node_sequence, self.uniprot_collection_has_protein_sequence)
+        # add_edge(node_uniprotkb, node_sequence, self.uniprot_collection_has_protein_sequence)
 
         for uniprotkb in fetch_uniprot:
             o = fetch_uniprot[uniprotkb]
