@@ -72,7 +72,7 @@ class ETLTransformUniref(ETLTransformGraph):
                     fetch_uniparc[uniparc_id]['hash'] = o['_to']
                     fetch_uniparc[uniparc_id]['node'] = node_sequence
                 else:
-                    logger.warning(f'expected length mismatch, expected: {expected_len}, actual: {len(sequence)}')
+                    logger.debug(f'expected length mismatch, expected: {expected_len}, actual: {len(sequence)}')
                 # node_sequence = self.add_node(h, self.re_seq_protein_collection, nodes, {'size': len(sequence)})
         reload = False
         for uniparc_id in fetch_uniparc:
@@ -108,39 +108,30 @@ class ETLTransformUniref(ETLTransformGraph):
         prot_seq = {}
         reload = False
 
+        def resolve_sequence(seq_key):
+            h = seq_key.split('/')[-1]
+            if h not in prot_seq:
+                sequence = self.protein_store.get_sequence(h)
+                prot_seq[h] = sequence
+            else:
+                sequence = prot_seq[h]
+            if len(sequence) == expected_len:
+                sequences.append(seq_key)
+                node_sequence = self.add_node(h, self.re_seq_protein_collection, nodes, {'size': len(sequence)})
+                fetch_uniprot[acc]['node'] = node_sequence
+                fetch_uniprot[acc]['hash'] = seq_key
+            else:
+                logger.debug(f'expected length mismatch, expected: {expected_len}, actual: {len(sequence)}')
+
         for k in query:
             acc = k['acc']
             expected_len = fetch_uniprot[acc]['expected_len']
             # print(acc, k)
             sequences = []
             for seq in k['sprot']:
-                h = seq.split('/')[-1]
-                if h not in prot_seq:
-                    sequence = self.protein_store.get_sequence(h)
-                    prot_seq[h] = sequence
-                else:
-                    sequence = prot_seq[h]
-                if len(sequence) == expected_len:
-                    sequences.append(seq)
-                    node_sequence = self.add_node(h, self.re_seq_protein_collection, nodes, {'size': len(sequence)})
-                    fetch_uniprot[acc]['node'] = node_sequence
-                    fetch_uniprot[acc]['hash'] = seq
-                else:
-                    logger.warning(f'expected length mismatch, expected: {expected_len}, actual: {len(sequence)}')
+                resolve_sequence(seq)
             for seq in k['trembl']:
-                h = seq.split('/')[-1]
-                if h not in prot_seq:
-                    sequence = self.protein_store.get_sequence(h)
-                    prot_seq[h] = sequence
-                else:
-                    sequence = prot_seq[h]
-                if len(sequence) == fetch_uniprot[acc]['expected_len']:
-                    sequences.append(seq)
-                    node_sequence = self.add_node(h, self.re_seq_protein_collection, nodes, {'size': len(sequence)})
-                    fetch_uniprot[acc]['node'] = node_sequence
-                    fetch_uniprot[acc]['hash'] = seq
-                else:
-                    logger.warning(f'expected length mismatch, expected: {expected_len}, actual: {len(sequence)}')
+                resolve_sequence(seq)
             if len(sequences) == 1:
                 fetch_uniprot[acc]['hash'] = sequences[0]
             else:
@@ -172,33 +163,9 @@ class ETLTransformUniref(ETLTransformGraph):
 
                 sequences = []
                 for seq in k['sprot']:
-                    h = seq.split('/')[-1]
-                    if h not in prot_seq:
-                        sequence = self.protein_store.get_sequence(h)
-                        prot_seq[h] = sequence
-                    else:
-                        sequence = prot_seq[h]
-                    if len(sequence) == fetch_uniprot[acc]['expected_len']:
-                        sequences.append(seq)
-                        node_sequence = self.add_node(h, self.re_seq_protein_collection, nodes, {'size': len(sequence)})
-                        fetch_uniprot[acc]['node'] = node_sequence
-                        fetch_uniprot[acc]['hash'] = seq
-                    else:
-                        logger.warning(f'expected length mismatch, expected: {expected_len}, actual: {len(sequence)}')
+                    resolve_sequence(seq)
                 for seq in k['trembl']:
-                    h = seq.split('/')[-1]
-                    if h not in prot_seq:
-                        sequence = self.protein_store.get_sequence(h)
-                        prot_seq[h] = sequence
-                    else:
-                        sequence = prot_seq[h]
-                    if len(sequence) == fetch_uniprot[acc]['expected_len']:
-                        sequences.append(seq)
-                        node_sequence = self.add_node(h, self.re_seq_protein_collection, nodes, {'size': len(sequence)})
-                        fetch_uniprot[acc]['node'] = node_sequence
-                        fetch_uniprot[acc]['hash'] = seq
-                    else:
-                        logger.warning(f'expected length mismatch, expected: {expected_len}, actual: {len(sequence)}')
+                    resolve_sequence(seq)
                 if len(sequences) == 1:
                     fetch_uniprot[acc]['hash'] = sequences[0]
         return fetch_uniprot
