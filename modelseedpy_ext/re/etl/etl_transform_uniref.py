@@ -151,7 +151,7 @@ class ETLTransformUniref(ETLTransformGraph):
                         fetch_uniparc[f'uniparc/{uniparc_id}'] = fetch_uniprot[acc]
                         del fetch_uniprot[acc]
                     else:
-                        raise Exception(f'unable to resolve reference: {fetch_uniprot[acc]}')
+                        raise ValueError(f'unable to resolve reference: {fetch_uniprot[acc]}')
 
         if reload:
             logger.warning('reload after new data')
