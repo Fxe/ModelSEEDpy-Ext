@@ -80,10 +80,10 @@ class ETLTransformUniref(ETLTransformGraph):
             if 'hash' not in data:
                 i = uniparc_id.split('/')[-1]
                 logger.warning(f'load uniparc: {i}')
-                nodes, edges = self.etl_transform_uniparc.transform(self.etl_extract_uniparc.extract(i))
+                _nodes, _edges = self.etl_transform_uniparc.transform(self.etl_extract_uniparc.extract(i))
                 self.etl_load.load({
-                    'nodes': nodes,
-                    'edges': edges
+                    'nodes': _nodes,
+                    'edges': _edges
                 })
                 reload = True
         if reload:
@@ -149,11 +149,11 @@ class ETLTransformUniref(ETLTransformGraph):
             if 'node' not in fetch_uniprot[acc] or fetch_uniprot[acc]['node'] is None:
                 try:
                     logger.warning(f'load uniprot: {acc}')
-                    nodes, edges = self.etl_transform_uniprot.transform(
+                    _nodes, _edges = self.etl_transform_uniprot.transform(
                         self.etl_extract_uniprot.extract(acc.split('/')[-1]))
                     self.etl_load.load({
-                        'nodes': nodes,
-                        'edges': edges
+                        'nodes': _nodes,
+                        'edges': _edges
                     })
                     reload = True
                 except ValueError:
