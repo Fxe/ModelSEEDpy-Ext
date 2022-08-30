@@ -107,36 +107,46 @@ class ETLTransformUniref(ETLTransformGraph):
         result = self.database.AQLQuery(self.aql_uniprot, bindVars={'acc_list': acc}, rawResults=True)
         return list(result)
 
+    def resolve_sequence(self, seq_key, expected_len, seq_cache):
+        h = seq_key.split('/')[-1]
+        if h not in seq_cache:
+            logger.debug(f"fetch protein sequence from database: {h}")
+            sequence = self.protein_store.get_sequence(h)
+            seq_cache[h] = sequence
+        else:
+            sequence = seq_cache[h]
+        if len(sequence) == expected_len:
+            # node_sequence = self.add_node(h, self.re_seq_protein_collection, nodes, {'size': len(sequence)})
+            # fetch_uniprot[acc]['node'] = node_sequence
+            #fetch_uniprot[acc]['hash'] = seq_key
+            return h, sequence
+        else:
+            logger.debug(f'expected length mismatch, expected: {expected_len}, actual: {len(sequence)}')
+        return None, None
+
     def get_uniprot_hash(self, fetch_uniprot, fetch_uniparc, nodes, fetch_missing=False):
         query = self.query_uniprot(list(fetch_uniprot))
         prot_seq = {}
         reload = False
 
-        def resolve_sequence(seq_key):
-            h = seq_key.split('/')[-1]
-            if h not in prot_seq:
-                sequence = self.protein_store.get_sequence(h)
-                prot_seq[h] = sequence
-            else:
-                sequence = prot_seq[h]
-            if len(sequence) == expected_len:
-                sequences.append(seq_key)
-                node_sequence = self.add_node(h, self.re_seq_protein_collection, nodes, {'size': len(sequence)})
-                fetch_uniprot[acc]['node'] = node_sequence
-                fetch_uniprot[acc]['hash'] = seq_key
-            else:
-                logger.debug(f'expected length mismatch, expected: {expected_len}, actual: {len(sequence)}')
-
         for k in query:
             acc = k['acc']
             expected_len = fetch_uniprot[acc]['expected_len']
             # print(acc, k)
-            sequences = []
+
             for seq in k['sprot']:
-                resolve_sequence(seq)
+                h, s = self.resolve_sequence(seq, expected_len, prot_seq)
+                if h and s:
+                    fetch_uniprot[acc]['hash'] = seq
+                    fetch_uniprot[acc]['node'] = self.add_node(h, self.re_seq_protein_collection,
+                                                               nodes, {'size': len(s)})
             for seq in k['trembl']:
-                resolve_sequence(seq)
-            if len(sequences) == 0:
+                h, s = self.resolve_sequence(seq, expected_len, prot_seq)
+                if h and s:
+                    fetch_uniprot[acc]['hash'] = seq
+                    fetch_uniprot[acc]['node'] = self.add_node(h, self.re_seq_protein_collection,
+                                                               nodes, {'size': len(s)})
+            if 'node' not in fetch_uniprot[acc] or fetch_uniprot[acc]['node'] is None:
                 try:
                     logger.warning(f'load uniprot: {acc}')
                     nodes, edges = self.etl_transform_uniprot.transform(
@@ -163,11 +173,18 @@ class ETLTransformUniref(ETLTransformGraph):
                 acc = k['acc']
                 expected_len = fetch_uniprot[acc]['expected_len']
 
-                sequences = []
                 for seq in k['sprot']:
-                    resolve_sequence(seq)
+                    h, s = self.resolve_sequence(seq, expected_len, prot_seq)
+                    if h and s:
+                        fetch_uniprot[acc]['hash'] = seq
+                        fetch_uniprot[acc]['node'] = self.add_node(h, self.re_seq_protein_collection,
+                                                                   nodes, {'size': len(s)})
                 for seq in k['trembl']:
-                    resolve_sequence(seq)
+                    h, s = self.resolve_sequence(seq, expected_len, prot_seq)
+                    if h and s:
+                        fetch_uniprot[acc]['hash'] = seq
+                        fetch_uniprot[acc]['node'] = self.add_node(h, self.re_seq_protein_collection,
+                                                                   nodes, {'size': len(s)})
         return fetch_uniprot
 
     def add_node(self, node_id, label, nodes, data=None):
