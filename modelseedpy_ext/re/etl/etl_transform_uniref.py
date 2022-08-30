@@ -103,8 +103,12 @@ class ETLTransformUniref(ETLTransformGraph):
 
         return fetch_uniparc
 
+    def query_uniprot(self, acc: list):
+        result = self.database.AQLQuery(self.aql_uniprot, bindVars={'acc_list': acc}, rawResults=True)
+        return list(result)
+
     def get_uniprot_hash(self, fetch_uniprot, fetch_uniparc, nodes, fetch_missing=False):
-        query = self.database.AQLQuery(self.aql_uniprot, bindVars={'acc_list': list(fetch_uniprot)}, rawResults=True)
+        query = self.query_uniprot(list(fetch_uniprot))
         prot_seq = {}
         reload = False
 
