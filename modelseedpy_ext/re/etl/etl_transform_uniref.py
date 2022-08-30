@@ -132,9 +132,7 @@ class ETLTransformUniref(ETLTransformGraph):
                 resolve_sequence(seq)
             for seq in k['trembl']:
                 resolve_sequence(seq)
-            if len(sequences) == 1:
-                fetch_uniprot[acc]['hash'] = sequences[0]
-            else:
+            if len(sequences) == 0:
                 try:
                     logger.warning(f'load uniprot: {acc}')
                     nodes, edges = self.etl_transform_uniprot.transform(
@@ -166,8 +164,6 @@ class ETLTransformUniref(ETLTransformGraph):
                     resolve_sequence(seq)
                 for seq in k['trembl']:
                     resolve_sequence(seq)
-                if len(sequences) == 1:
-                    fetch_uniprot[acc]['hash'] = sequences[0]
         return fetch_uniprot
 
     def add_node(self, node_id, label, nodes, data=None):
