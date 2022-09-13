@@ -30,6 +30,20 @@ class KEGenome:
             self.d_hash[o.id] = hash_d
             self.p_hash[o.id] = hash_p
 
+        self.loc_pos = {}
+        self.gene_pairs = set()
+        self.f_pairs = {}
+        self.null_pairs = {}
+        self.anno_pairs = {}
+        self.null_annotation = {'rast/hypotheticalprotein', 'rast/null'}
+
+    def run(self):
+        self.fetch_annotation()
+        self.loc_pos = self.loc_pos()
+        self.gene_pairs = self.pairs(self.loc_pos)
+        self.f_pairs = self.f_pairs(self.gene_pairs)
+        self.null_pairs, self.anno_pairs = self.get_pp(self.f_pairs)
+
     @staticmethod
     def load_from_kbase(kbase, object_id, ws, kb_re, rast, load_arango, transform_rast):
         print('get genome')
@@ -166,6 +180,17 @@ class KEGenome:
             f_pairs[f_pair] += 1
 
         return f_pairs
+
+    def get_pp(self, f_pairs1):
+        null_pairs1 = {}
+        anno_pairs1 = {}
+        for p in f_pairs1:
+            p1, p2 = p
+            if p1 in self.null_annotation or p2 in self.null_annotation:
+                null_pairs1[p] = f_pairs1[p]
+            else:
+                anno_pairs1[p] = f_pairs1[p]
+        return null_pairs1, anno_pairs1
 
 
 def locate_feature_dna_sequence_in_contig(f, contigs):

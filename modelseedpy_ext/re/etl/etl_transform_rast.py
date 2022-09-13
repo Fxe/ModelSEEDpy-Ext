@@ -7,9 +7,8 @@ logger = logging.getLogger(__name__)
 
 class ETLRast(ETLTransformGraph):
 
-    def __init__(self, rast, dna_store, protein_store):
+    def __init__(self, rast, protein_store):
         super().__init__()
-        self.dna_store = dna_store
         self.protein_store = protein_store
         self.rast = rast
 
