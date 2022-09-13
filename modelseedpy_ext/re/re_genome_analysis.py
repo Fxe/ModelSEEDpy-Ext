@@ -39,9 +39,9 @@ class KEGenome:
 
     def run(self):
         self.fetch_annotation()
-        self.loc_pos = self.loc_pos()
-        self.gene_pairs = self.pairs(self.loc_pos)
-        self.f_pairs = self.f_pairs(self.gene_pairs)
+        self.loc_pos = self.get_loc_pos()
+        self.gene_pairs = self.get_pairs(self.loc_pos)
+        self.f_pairs = self.get_f_pairs(self.gene_pairs)
         self.null_pairs, self.anno_pairs = self.get_pp(self.f_pairs)
 
     @staticmethod
@@ -111,7 +111,7 @@ class KEGenome:
                 'edges': _edges
             })
 
-    def loc_pos(self):
+    def get_loc_pos(self):
         loc_pos = {}
         for f in self.genome.features:
             ll = locate_feature_dna_sequence_in_contig(f, self.contigs)
@@ -142,7 +142,7 @@ class KEGenome:
 
         return loc_pos
 
-    def pairs(self, loc_pos):
+    def get_pairs(self, loc_pos):
         p_gene_id_pairs = set()
         s_pmin = sorted(loc_pos)
 
@@ -169,7 +169,7 @@ class KEGenome:
 
         return p_gene_id_pairs
 
-    def f_pairs(self, p_gene_id_pairs):
+    def get_f_pairs(self, p_gene_id_pairs):
         f_pairs = {}
         for g1, g2 in p_gene_id_pairs:
             f1 = self.p_annotation['re_seq_protein/' + self.p_hash[g1]]
