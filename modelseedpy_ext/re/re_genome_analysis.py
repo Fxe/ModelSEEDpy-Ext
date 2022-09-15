@@ -25,10 +25,12 @@ class KEGenome:
         self.d_hash = {}
         self.p_hash = {}
         for o in self.genome.features:
-            hash_p = self.seq_protein_store.store_sequence(o.protein_translation)
-            hash_d = self.seq_dna_store.store_sequence(o.dna_sequence)
-            self.d_hash[o.id] = hash_d
-            self.p_hash[o.id] = hash_p
+            if o.protein_translation:
+                hash_p = self.seq_protein_store.store_sequence(o.protein_translation)
+                self.p_hash[o.id] = hash_p
+            if o.dna_sequence:
+                hash_d = self.seq_dna_store.store_sequence(o.dna_sequence)
+                self.d_hash[o.id] = hash_d
 
         self.loc_pos = {}
         self.gene_pairs = set()
@@ -193,7 +195,7 @@ class KEGenome:
         return null_pairs1, anno_pairs1
 
 
-def locate_feature_dna_sequence_in_contig(f, contigs):
+def locate_feature_dna_sequence_in_contig(f, contigs, skip_seq_match=False):
     ll = []
     contig_sub_strings = []
 
@@ -223,7 +225,7 @@ def locate_feature_dna_sequence_in_contig(f, contigs):
             # print(f.id, l, f.functions, contig_sub_string == f.dna_sequence)
         else:
             print('contig not found:', contig_id)
-    if ''.join(contig_sub_strings) == f.dna_sequence:
+    if skip_seq_match or ''.join(contig_sub_strings) == f.dna_sequence:
         return ll
     return []
 
