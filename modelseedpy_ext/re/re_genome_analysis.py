@@ -42,7 +42,10 @@ class KEGenome:
     def run(self):
         self.fetch_annotation()
         self.loc_pos = self.get_loc_pos()
-        self.gene_pairs = self.get_pairs(self.loc_pos)
+        self.gene_pairs = set()
+        for contig_id in self.loc_pos:
+            pairs = self.get_pairs(self.loc_pos[contig_id])
+            self.gene_pairs |= pairs
         self.f_pairs = self.get_f_pairs(self.gene_pairs)
         self.null_pairs, self.anno_pairs = self.get_pp(self.f_pairs)
 
@@ -113,10 +116,17 @@ class KEGenome:
                 'edges': _edges
             })
 
-    def get_loc_pos(self):
+    def get_loc_pos(self, skip_seq_match=False):
         loc_pos = {}
         for f in self.genome.features:
-            ll = locate_feature_dna_sequence_in_contig(f, self.contigs)
+            ll = locate_feature_dna_sequence_in_contig(f, self.contigs, skip_seq_match)
+            contig_id = [x[0] for x in ll]
+            if len(contig_id) == 1:
+                contig_id = contig_id[0]
+            else:
+                raise ValueError('!!!' + str(contig_id))
+            if contig_id not in loc_pos:
+                loc_pos[contig_id] = {}
             if len(ll) == 0:
                 print(ll, f.id)
                 break
@@ -138,9 +148,9 @@ class KEGenome:
                         p_max = o[3]
                 if p_min >= p_max:
                     raise ValueError(f'assertion fail for p_min < pmax: ({p_min}, {p_max})')
-                if p_min not in loc_pos:
-                    loc_pos[p_min] = []
-                loc_pos[p_min].append([ll, p_min, p_max, [], []])
+                if p_min not in loc_pos[contig_id]:
+                    loc_pos[contig_id][p_min] = []
+                loc_pos[contig_id][p_min].append([ll, p_min, p_max, [], []])
 
         return loc_pos
 
