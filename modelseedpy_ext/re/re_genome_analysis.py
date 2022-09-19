@@ -25,12 +25,16 @@ class KEGenome:
         self.d_hash = {}
         self.p_hash = {}
         for o in self.genome.features:
-            if o.protein_translation:
-                hash_p = self.seq_protein_store.store_sequence(o.protein_translation)
-                self.p_hash[o.id] = hash_p
             if o.dna_sequence:
                 hash_d = self.seq_dna_store.store_sequence(o.dna_sequence)
                 self.d_hash[o.id] = hash_d
+            if o.protein_translation:
+                hash_p = self.seq_protein_store.store_sequence(o.protein_translation)
+                self.p_hash[o.id] = hash_p
+            elif len(o.dna_sequence) % 3 == 0:
+                protein_translation = Seq(o.dna_sequence).translate()
+                hash_p = self.seq_protein_store.store_sequence(protein_translation)
+                self.p_hash[o.id] = hash_p
 
         self.loc_pos = {}
         self.gene_pairs = set()
