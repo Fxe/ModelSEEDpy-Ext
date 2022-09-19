@@ -1,6 +1,9 @@
+import logging
 import itertools
 from modelseedpy import MSGenome
 from Bio.Seq import Seq
+
+logger = logging.getLogger(__name__)
 
 
 class KEGenome:
@@ -32,16 +35,19 @@ class KEGenome:
                 hash_p = self.seq_protein_store.store_sequence(o.protein_translation)
                 self.p_hash[o.id] = hash_p
             elif len(o.dna_sequence) % 3 == 0:
-                protein_translation = Seq(o.dna_sequence).translate()
-                hash_p = self.seq_protein_store.store_sequence(protein_translation)
-                self.p_hash[o.id] = hash_p
+                try:
+                    protein_translation = Seq(o.dna_sequence).translate()
+                    hash_p = self.seq_protein_store.store_sequence(protein_translation)
+                    self.p_hash[o.id] = hash_p
+                except ValueError as e:
+                    logger.debug(f"unable to translate {e}")
 
         self.loc_pos = {}
         self.gene_pairs = set()
         self.f_pairs = {}
         self.null_pairs = {}
         self.anno_pairs = {}
-        self.null_annotation = {'rast/hypotheticalprotein', 'rast/null'}
+        self.null_annotation = {'rast/hypotheticalprotein', 'rast/null', None}
 
     def run(self):
         self.fetch_annotation()
@@ -188,8 +194,16 @@ class KEGenome:
     def get_f_pairs(self, p_gene_id_pairs):
         f_pairs = {}
         for g1, g2 in p_gene_id_pairs:
-            f1 = self.p_annotation['re_seq_protein/' + self.p_hash[g1]]
-            f2 = self.p_annotation['re_seq_protein/' + self.p_hash[g2]]
+
+            if g1 in self.p_hash:
+                f1 = self.p_annotation['re_seq_protein/' + self.p_hash[g1]]
+            else:
+                f1 = None
+            if g2 in self.p_hash:
+                f2 = self.p_annotation['re_seq_protein/' + self.p_hash[g2]]
+            else:
+                f2=None
+
             f_pair = (f1, f2)
             if f_pair not in f_pairs:
                 f_pairs[f_pair] = 0
