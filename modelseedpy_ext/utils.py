@@ -1,4 +1,9 @@
+import hashlib
 import pandas as pd
+
+
+def sha_hex(s: str):
+    return hashlib.sha256(s.encode('utf-8')).hexdigest()
 
 
 def test_core_template(template, media_file):

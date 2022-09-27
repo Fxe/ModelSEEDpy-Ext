@@ -27,9 +27,12 @@ class RE:
             'EC_number',
             
             're_contig', 're_contig_set', 're_seq_dna', 're_seq_protein',
-            
+
             'kegg_gene',
             'alphafolddb',
+
+            'rast_function',
+            'rast_search_function',
         ]
         for c in collections:
             if not self.db.hasCollection(c):
@@ -52,6 +55,10 @@ class RE:
             'eco_term_sub_class_of_eco_term',
             
             're_contig_set_has_contig',
+
+            'rast_function_has_sub_function',
+            'rast_function_has_search_function',
+            're_seq_protein_has_rast_function',
         ]
         for c in edges:
             if not self.db.hasCollection(c):

@@ -61,14 +61,10 @@ class KEGenome:
 
     @staticmethod
     def load_from_kbase(kbase, object_id, ws, kb_re, rast, load_arango, transform_rast):
-        print('get genome')
         genome = kbase.get_from_ws(object_id, ws)
-        print('get assembly')
         assembly = kbase.get_from_ws(genome.assembly_ref)
-        print('get assembly handle_ref:', assembly.fasta_handle_ref)
         kbase.download_file_from_kbase2(assembly.fasta_handle_ref,
                                         '/home/fliu/kbase/cache/handle/' + assembly.fasta_handle_ref)
-        print('read contigs')
         ms_contigs = MSGenome.from_fasta('/home/fliu/kbase/cache/handle/' + assembly.fasta_handle_ref, split=' ')
 
         return KEGenome(genome, assembly, ms_contigs, rast, kb_re, load_arango, transform_rast)
