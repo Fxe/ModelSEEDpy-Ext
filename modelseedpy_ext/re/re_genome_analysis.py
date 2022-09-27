@@ -49,8 +49,8 @@ class KEGenome:
         self.anno_pairs = {}
         self.null_annotation = {'rast/hypotheticalprotein', 'rast/null', None}
 
-    def run(self):
-        self.fetch_annotation()
+    def run(self, batch_size=20):
+        self.fetch_annotation(batch_size)
         self.loc_pos = self.get_loc_pos()
         self.gene_pairs = set()
         for contig_id in self.loc_pos:
@@ -83,9 +83,9 @@ class KEGenome:
 
         return h_list
 
-    def fetch_annotation(self):
+    def fetch_annotation(self, batch_size=20):
         h_list = self._fetch_annotation_arango()
-        self.etl_rast(h_list)
+        self.etl_rast(h_list, batch_size)
         self._fetch_annotation_arango()
 
         return self.p_annotation
