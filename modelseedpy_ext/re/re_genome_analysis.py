@@ -71,7 +71,7 @@ class KEGenome:
 
     def _fetch_annotation_arango(self):
         aql = """
-        FOR doc_protein IN re_seq_protein_has_rast_annotation
+        FOR doc_protein IN re_seq_protein_has_rast_function
             FILTER doc_protein._from IN @h
             RETURN [doc_protein._from, doc_protein._to]
         """
