@@ -228,7 +228,7 @@ class RE:
 
     def query_uniprot_by_ec_v2(self, ec: str, db="sprot", min_dist=1, max_dist=4, limit=None):
         _param_uprot_ec, _param_uprot_acc = self._get_uniprot_database_pairs(db)
-        res_ec_childs = query_ec_childs(ec, min_dist, max_dist)
+        res_ec_childs = self.query_ec_childs(ec, min_dist, max_dist)
 
         _param_limit = "" if limit is None else f"LIMIT {limit}"
 
@@ -250,5 +250,5 @@ class RE:
             params = {
                 'ec': f'EC_number/{ec_child}'
             }
-            res[ec_child] = {x for x in kb_re.db.AQLQuery(aql_ec_to_uniprot, rawResults=True, bindVars=params)}
+            res[ec_child] = {x for x in self.db.AQLQuery(aql_ec_to_uniprot, rawResults=True, bindVars=params)}
         return res
