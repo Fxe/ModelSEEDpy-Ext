@@ -1,5 +1,6 @@
 import logging
 import itertools
+import pandas as pd
 from modelseedpy import MSGenome
 from Bio.Seq import Seq
 
@@ -49,7 +50,7 @@ class KEGenome:
         self.anno_pairs = {}
         self.null_annotation = {'rast/hypotheticalprotein', 'rast/null', None}
 
-    def run(self, batch_size=20):
+    def run(self, batch_size=20, skip_seq_match=False):
         self.fetch_annotation(batch_size)
         self.loc_pos = self.get_loc_pos()
         self.gene_pairs = set()
@@ -254,6 +255,95 @@ def locate_feature_dna_sequence_in_contig(f, contigs, skip_seq_match=False):
     return []
 
 
-# ll = locate_feature_dna_sequence_in_contig(f, contigs)
-# ll
+class GenomeCluster:
 
+    def __init__(self, genomes, gcf_to_ani, filename='./data/fastani_library.txt'):
+        self.genomes = genomes
+        self.ani_id_index = self.get_ani_id_index(filename)
+        self.g_order = list(self.genomes)
+        self.gcf_to_ani = gcf_to_ani
+
+    @staticmethod
+    def get_ani_id_index(filename='./data/fastani_library.txt'):
+        df = pd.read_csv(filename, header=None, index_col=0)
+        order = [row_id for row_id, d in df.iterrows()]
+        ani_id_index = {}
+        for i in range(len(order)):
+            ani_id_index[order[i].split('/')[-1]] = i
+
+        return ani_id_index
+
+    def score(self, g1, g2, matrix):
+        ke_genome1 = self.genomes[g1]
+        ke_genome2 = self.genomes[g2]
+        total_pairs = 0
+        for p in ke_genome2.f_pairs:
+            total_pairs += ke_genome2.f_pairs[p]
+
+        common_pairs = 0
+        for p in ke_genome2.anno_pairs:
+            if p in ke_genome1.anno_pairs:
+                c1 = ke_genome2.anno_pairs[p]
+                c2 = ke_genome1.anno_pairs[p]
+                if c1 >= c2:
+                    common_pairs += c2
+                else:
+                    common_pairs += c1
+
+        anno_1 = set()
+        anno_2 = set()
+        for a1, a2 in ke_genome2.f_pairs:
+            anno_1.add(a1)
+            anno_1.add(a2)
+        for a1, a2 in ke_genome1.f_pairs:
+            anno_2.add(a1)
+            anno_2.add(a2)
+
+        jaccard = len(set(anno_1 & anno_2)) / len(set(anno_1 | anno_2))
+        i1 = self.ani_id_index[self.gcf_to_ani[g1][0]]
+        i2 = self.ani_id_index[self.gcf_to_ani[g2][0]]
+        ani_1_2 = matrix[i1][i2]
+        ani_2_1 = matrix[i2][i1]
+        # ani_a_b = gcf_to_ani
+        return total_pairs, common_pairs, common_pairs / total_pairs, jaccard, ani_1_2, ani_2_1
+
+    def run(self, matrix_h5_filename='./data/ani_matrix.h5') -> dict:
+        import h5py
+        f = h5py.File(matrix_h5_filename, 'r')
+        matrix = f['matrix']
+        scores = {}
+        for i1 in range(len(self.g_order)):
+            g1 = self.g_order[i1]
+            scores[g1] = {}
+            for i2 in range(len(self.g_order) - i1):
+                g2 = self.g_order[i2 + i1]
+                scores[g1][g2] = self.score(g1, g2, matrix)
+        f.close()
+        return scores
+
+    def write(self, scores, filename='./data/score_matrix.tsv'):
+        with open(filename, 'w') as fh:
+            fh.write('\t')
+            for i1 in range(len(self.g_order)):
+                g1 = self.g_order[i1]
+                fh.write(g1)
+                fh.write('\t')
+            fh.write('\n')
+            for i1 in range(len(self.g_order)):
+                g1 = self.g_order[i1]
+                fh.write(g1)
+                fh.write('\t')
+                for i2 in range(len(self.g_order)):
+                    g2 = self.g_order[i2]
+                    if g1 in scores and g2 in scores[g1]:
+                        s = scores[g1][g2]
+                    else:
+                        s = scores[g2][g1]
+                    ani1 = s[4]
+                    ani2 = s[5]
+                    ani = s[2]
+                    if g1 == g2:
+                        ani = 0
+                    fh.write(str(ani))
+                    fh.write('\t')
+                fh.write('\n')

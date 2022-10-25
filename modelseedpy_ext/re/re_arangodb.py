@@ -174,3 +174,81 @@ class RE:
                 'contigs': [o for o in res],
             }
         return None
+
+    def query_ec_childs(self, ec: str, min_dist=1, max_dist=4):
+        _aql_param_ec = f'EC_number/{ec}'
+        aql_ec_childs = """
+        FOR v, e, p IN @min_dist..@max_dist OUTBOUND @ec GRAPH 'ec_graph'
+                RETURN v._id
+        """
+        params = {
+            'min_dist': min_dist,
+            'max_dist': max_dist,
+            'ec': _aql_param_ec
+        }
+        # strip the collection ID amd return results
+        return {x[10:] for x in self.db.AQLQuery(aql_ec_childs, rawResults=True, bindVars=params)}
+
+    @staticmethod
+    def _get_uniprot_database_pairs(db: str):
+        if db == 'sprot':
+            return "uniprotkb_sprot_has_ec", "uniprotkb_sprot_has_accession"
+        elif db == 'trembl':
+            return "uniprotkb_trembl_has_ec", "uniprotkb_trembl_has_accession"
+        else:
+            raise ValueError(f"found {db}, db must be either sprot or trembl")
+
+    def query_uniprot_by_ec(self, ec: str, db="sprot", min_dist=1, max_dist=4, limit=None):
+        _param_uprot_ec, _param_uprot_acc = self._get_uniprot_database_pairs(db)
+        _param_limit = "" if limit is None else f"LIMIT {limit}"
+
+        aql_ec_to_uniprot = f"""
+        LET ec_nodes = (
+            FOR v, e, p IN @min_dist..@max_dist OUTBOUND @ec GRAPH 'ec_graph'
+                RETURN v._id
+            )
+    
+        LET uniprot_nodes = (
+        FOR e IN {_param_uprot_ec}
+            FILTER e._to IN ec_nodes
+            {_param_limit}
+            RETURN e._from
+        )
+    
+        FOR e IN {_param_uprot_acc}
+            FILTER e._from IN uniprot_nodes
+            RETURN e._to
+        """
+        params = {
+            'min_dist': min_dist,
+            'max_dist': max_dist,
+            'ec': f'EC_number/{ec}'
+        }
+        return {x for x in self.db.AQLQuery(aql_ec_to_uniprot, rawResults=True, bindVars=params)}
+
+    def query_uniprot_by_ec_v2(self, ec: str, db="sprot", min_dist=1, max_dist=4, limit=None):
+        _param_uprot_ec, _param_uprot_acc = self._get_uniprot_database_pairs(db)
+        res_ec_childs = query_ec_childs(ec, min_dist, max_dist)
+
+        _param_limit = "" if limit is None else f"LIMIT {limit}"
+
+        aql_ec_to_uniprot = f"""
+        LET uniprot_nodes = (
+        FOR e IN {_param_uprot_ec}
+            FILTER e._to == @ec
+            {_param_limit}
+            RETURN e._from
+        )
+        
+        FOR e IN {_param_uprot_acc}
+            FILTER e._from IN uniprot_nodes
+            RETURN e._to
+        """
+
+        res = {}
+        for ec_child in res_ec_childs:
+            params = {
+                'ec': f'EC_number/{ec_child}'
+            }
+            res[ec_child] = {x for x in kb_re.db.AQLQuery(aql_ec_to_uniprot, rawResults=True, bindVars=params)}
+        return res
