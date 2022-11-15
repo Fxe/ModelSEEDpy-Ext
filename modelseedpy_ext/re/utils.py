@@ -155,3 +155,18 @@ def build_ec_tree(re, load_arango):
     })
 
     print('done!')
+
+def get_value_set_hash(genome, fn_hash, fn_get):
+    list_seqs = []
+    for f in genome.features:
+        v = fn_get(f)
+        if v and len(v) > 0:
+            list_seqs.append(fn_hash(v))
+    list_seqs_sorted = sorted(list_seqs)
+    return fn_hash('_'.join(list_seqs_sorted))
+
+def get_dna_set_hash_from_kbase_genome(genome, fn_hash):
+    return get_value_set_hash(genome, fn_hash, lambda f: f.dna_sequence)
+
+def get_protein_set_hash_from_kbase_genome(genome, fn_hash):
+    return get_value_set_hash(genome, fn_hash, lambda f: f.protein_translation)

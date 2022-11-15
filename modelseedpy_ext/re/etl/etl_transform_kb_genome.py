@@ -129,3 +129,64 @@ class ETLTransformKBaseGenome(ETLTransformGraph):
         add_edge(node_ws_genome_object, node_seq_protein_set, 'ws_genome_has_seq_protein_set')
         
         return nodes, edges
+
+
+class ETLGenome(ETLTransformGraph):
+
+    def __init__(self, transform_kbase_object, transform_contigs, kbase):
+        super().__init__()
+        self.kbase = kbase
+        self.transform_kbase_object = transform_kbase_object
+        self.transform_contigs = transform_contigs
+
+    def etl(self, genome):
+        nodes = {}
+        edges = {}
+
+        def add_node(node_id, label, data=None):
+            if label not in nodes:
+                nodes[label] = {}
+            if label in nodes:
+                _node = self.build_node(node_id, label, data)
+                if _node.id not in nodes[label]:
+                    nodes[label][_node.id] = _node
+                else:
+                    # print('dup', _node.id)
+                    pass
+
+                return nodes[label][_node.id]
+
+            logger.error('add_node error')
+            return None
+
+        def add_edge(node_from, node_to, label, data=None):
+            if label not in edges:
+                edges[label] = []
+            if label in edges:
+                _edge = self.transform_edge(node_from, node_to, data)
+                edges[label].append(_edge)
+                return _edge
+
+            logger.error('add_edge error')
+            return None
+
+        assembly = self.kbase.get_from_ws(genome.assembly_ref)
+
+        g_nodes, g_edges = self.transform_kbase_object.transform(genome.info)
+        if assembly:
+            a_nodes, a_edges = self.transform_kbase_object.transform(assembly.info)
+            node_genome = list(a_nodes['kbase_object'].values())[0]
+            node_assembly = list(g_nodes['kbase_object'].values())[0]
+            add_edge(node_genome, node_assembly, 'kbase_object_has_object_reference', {'value': 'assembly_ref'})
+
+            i = str(assembly.info).replace('/', '_')
+            self.kbase.download_file_from_kbase2(assembly.fasta_handle_ref, f'/home/fliu/kbase/cache/handle/{i}')
+            assembly_contigs = MSGenome.from_fasta(f'/home/fliu/kbase/cache/handle/{i}')
+            contig_set = [x.seq for x in assembly_contigs.features]
+
+            c_nodes, c_edges = self.transform_contigs.transform(contig_set)
+
+            node_contig_set = list(c_nodes['re_contig_set'].values())[0]
+
+            add_edge(node_contig_set, node_assembly, 're_contig_set_in_object')
+
