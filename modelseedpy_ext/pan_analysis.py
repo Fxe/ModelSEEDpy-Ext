@@ -3,6 +3,7 @@ import os
 import json
 import subprocess
 import pandas as pd
+from pandas import DataFrame
 from modelseedpy import RastClient, MSGenome
 from modelseedpy.core.msgenome import normalize_role
 
@@ -40,34 +41,36 @@ class PanAnalysis:
                             self.function_to_clusters[nmz_role] = set()
                         self.function_to_clusters[nmz_role].add(cluster_id)
 
-    def run_motu(self):
+    def run_motu(self) -> DataFrame:
         output_motu_file = f'{os.path.abspath(self.id)}/motu_output.txt'
-        if os.path.exists(output_motu_file):
-            self.df_motu_output = pd.read_csv(output_motu_file, sep='\t', comment='#', index_col=0)
-            return None
+        if not os.path.exists(output_motu_file):
+            input_faa_file = f'{self.id}/motu_input.txt'
+            if not os.path.exists(input_faa_file):
+                logger.info(f'create mOTU input file {input_faa_file}')
+                with open(input_faa_file, 'w') as fh:
+                    for s in self.genomes:
+                        fh.write(f'/home/fliu/mice/gtdb_prokka/{s}.faa\n')
 
-        input_faa_file = f'{self.id}/motu_input.txt'
-        if not os.path.exists(input_faa_file):
-            print(f'create mOTU input file {input_faa_file}')
-            with open(input_faa_file, 'w') as fh:
-                for s in self.genomes:
-                    fh.write(f'/home/fliu/mice/gtdb_prokka/{s}.faa\n')
-        ret = subprocess.run([
-            "python3",
-            "/home/fliu/python3/mOTUlizer/mOTUlizer/bin/mOTUpan.py",
-            '--txt',
-            '--faas', os.path.abspath(input_faa_file),
-            '--output', output_motu_file
-        ], capture_output=True)
+            cmd = [
+                "python3",
+                "/home/fliu/python3/mOTUlizer/mOTUlizer/bin/mOTUpan.py",
+                '--txt',
+                '--faas', os.path.abspath(input_faa_file),
+                '--output', output_motu_file
+            ]
+
+            logger.info(f'running mOTU {cmd}')
+            ret = subprocess.run(cmd, capture_output=True)
 
         self.df_motu_output = pd.read_csv(output_motu_file, sep='\t', comment='#', index_col=0)
 
-        return ret
+        return self.df_motu_output
 
     def get_genome_object(self, genome_id):
         if genome_id not in self.genomes_objects:
-            print('fetch', genome_id)
             f = f'/home/fliu/mice/gtdb_prokka/{genome_id}.faa'
+            logger.debug(f'fetch {genome_id} {f}')
+
             genome = MSGenome.from_fasta(f, split=' # ')
             self.genomes_objects[genome_id] = genome
         return self.genomes_objects[genome_id]
