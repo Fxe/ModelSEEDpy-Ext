@@ -34,10 +34,11 @@ class PanAnalysis:
 
     def index_kbase_mags(self, kbase_api):
         for object_id in self.kbase_mags:
-            genome = kbase_api.get_from_ws(object_id + '.RAST', 132089)
+            object_id = object_id + '.RAST' # dumb hack
+            genome = kbase_api.get_from_ws(object_id, 132089)
             genome_faa_filename = f'{os.path.abspath(self.id)}/{genome.id}.faa'
             genome.to_fasta(genome_faa_filename)
-            self.kbase_mags.add(genome_faa_filename)
+            self.kbase_mags_faa.add(genome_faa_filename)
             self.genomes_objects[object_id] = genome
 
     def index_function_to_clusters(self):
@@ -127,7 +128,8 @@ class PanAnalysis:
         self.seq_annotation = {}
         self.bad_seqs = set()
         rast = RastClient()
-        for genome_id in self.genomes:
+        genome_ids = set(self.genomes) | set(self.genomes_objects)
+        for genome_id in genome_ids:
             genome = self.get_genome_object(genome_id)
             output_rast_file = f'{os.path.abspath(self.id)}/{genome_id}.json'
             if os.path.exists(output_rast_file):
