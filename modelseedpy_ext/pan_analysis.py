@@ -12,9 +12,11 @@ logger = logging.getLogger(__name__)
 
 class PanAnalysis:
 
-    def __init__(self, analysis_id, genomes):
+    def __init__(self, analysis_id, genomes, kbase_mags):
         self.id = analysis_id
         self.genomes = genomes
+        self.kbase_mags = kbase_mags
+        self.kbase_mags_faa = set()
         if not os.path.exists(self.id):
             print(f'create folder {self.id}')
             os.mkdir(self.id)
@@ -24,10 +26,19 @@ class PanAnalysis:
         self.cluster_functions_cft = None
         self.cluster_functions_type = None
         self.function_to_clusters = None
+        self.completeness = {}
 
         self.seq_annotation = None
         self.bad_seqs = None
         self.genomes_objects = {}
+
+    def index_kbase_mags(self, kbase_api):
+        for object_id in self.kbase_mags:
+            genome = kbase_api.get_from_ws(object_id + '.RAST', 132089)
+            genome_faa_filename = f'{os.path.abspath(self.id)}/{genome.id}.faa'
+            genome.to_fasta(genome_faa_filename)
+            self.kbase_mags.add(genome_faa_filename)
+            self.genomes_objects[object_id] = genome
 
     def index_function_to_clusters(self):
         self.function_to_clusters = {}
@@ -50,6 +61,8 @@ class PanAnalysis:
                 with open(input_faa_file, 'w') as fh:
                     for s in self.genomes:
                         fh.write(f'/home/fliu/mice/gtdb_prokka/{s}.faa\n')
+                    for s in self.kbase_mags_faa:
+                        fh.write(f'{s}\n')
 
             cmd = [
                 "python3",
