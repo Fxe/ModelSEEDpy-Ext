@@ -1,6 +1,7 @@
 import efmtool
 import numpy as np
 
+
 def get_solutions(efms, reactions):
     t = efms.transpose()
     res = []
@@ -14,10 +15,11 @@ def get_solutions(efms, reactions):
         res.append(flux_v)
     return res
 
+
 def efm(model):
     metabolites = list(map(lambda x: x.id, model.metabolites))
     reactions = list(map(lambda x: x.id, model.reactions))
-    
+
     s_array = []
     rev = []
     for r in reactions:
@@ -33,8 +35,7 @@ def efm(model):
         rev.append(1 if rxn.lower_bound < 0 and rxn.upper_bound > 0 else 0)
     S = np.array(s_array)
     S = S.transpose()
-    
+
     efms = efmtool.calculate_efms(S, rev, reactions, metabolites)
-    
+
     return get_solutions(efms, reactions)
-    

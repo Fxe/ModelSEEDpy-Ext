@@ -10,24 +10,26 @@ HEADER = """<?xml version="1.0" encoding="UTF-8"?>
 FOOTER = "</uniprot>"
 
 
-def split_into_blocks(uniprot_file, output_folder, l_block_size=2500, l_max=None, h=HEADER, f=FOOTER):
+def split_into_blocks(
+    uniprot_file, output_folder, l_block_size=2500, l_max=None, h=HEADER, f=FOOTER
+):
     i = 0
-    with open(uniprot_file, 'r') as fh:
+    with open(uniprot_file, "r") as fh:
         line = fh.readline()
         xml_record = None
         block_index = 0
         written = 0
-        fh_write = open(f'{output_folder}/block_{block_index}_{l_block_size}.xml', 'w')
+        fh_write = open(f"{output_folder}/block_{block_index}_{l_block_size}.xml", "w")
         if h:
             fh_write.write(h)
         while line:
             line = fh.readline()
             i += 1
 
-            if '<entry dataset' in line and xml_record is None:
+            if "<entry dataset" in line and xml_record is None:
                 xml_record = ""
                 xml_record += line
-            elif '</entry' in line:
+            elif "</entry" in line:
                 xml_record += line
                 fh_write.write(xml_record)
                 xml_record = None
@@ -38,7 +40,9 @@ def split_into_blocks(uniprot_file, output_folder, l_block_size=2500, l_max=None
                     fh_write.close()
                     block_index += 1
                     written = 0
-                    fh_write = open(f'{output_folder}/block_{block_index}_{l_block_size}.xml', 'w')
+                    fh_write = open(
+                        f"{output_folder}/block_{block_index}_{l_block_size}.xml", "w"
+                    )
                     if h:
                         fh_write.write(h)
             else:
@@ -46,9 +50,9 @@ def split_into_blocks(uniprot_file, output_folder, l_block_size=2500, l_max=None
                     xml_record += line
 
             if l_max and i > l_max:
-                logger.warning('max lines exceeded term')
+                logger.warning("max lines exceeded term")
 
         if f:
-            fh_write.write(f)                
+            fh_write.write(f)
         fh_write.close()
         return block_index

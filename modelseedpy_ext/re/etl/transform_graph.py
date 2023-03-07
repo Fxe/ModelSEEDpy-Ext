@@ -2,7 +2,6 @@ from networkx import DiGraph, compose
 
 
 class Node:
-
     def __init__(self, key, label, data=None):
         self._key = key
         self.label = label
@@ -10,11 +9,11 @@ class Node:
 
     @property
     def key(self):
-        return self._key.replace(' ', '_')
+        return self._key.replace(" ", "_")
 
     @property
     def id(self):
-        return f'{self.label}/{self.key}'
+        return f"{self.label}/{self.key}"
 
     def __hash__(self):
         return hash(self.id)
@@ -24,7 +23,6 @@ class Node:
 
 
 class TransformGraph(DiGraph):
-
     def __init__(self, incoming_graph_data=None):
         super().__init__(incoming_graph_data)
 

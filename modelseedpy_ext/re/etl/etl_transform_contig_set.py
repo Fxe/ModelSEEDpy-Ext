@@ -6,7 +6,6 @@ logger = logging.getLogger(__name__)
 
 
 class ETLTransformContigSet(ETLTransformGraph):
-
     def __init__(self, dna_store):
         super().__init__()
         self.dna_store = dna_store
@@ -28,7 +27,7 @@ class ETLTransformContigSet(ETLTransformGraph):
 
                 return nodes[label][_node.id]
 
-            logger.error('add_node error')
+            logger.error("add_node error")
             return None
 
         def add_edge(node_from, node_to, label, data=None):
@@ -39,7 +38,7 @@ class ETLTransformContigSet(ETLTransformGraph):
                 edges[label].append(_edge)
                 return _edge
 
-            logger.error('add_edge error')
+            logger.error("add_edge error")
             return None
 
         hash_list = []
@@ -51,14 +50,14 @@ class ETLTransformContigSet(ETLTransformGraph):
                 symbols[o] += 1
             h = self.dna_store.store_sequence(dna_seq)
             hash_list.append(h)
-            add_node(h, 're_contig', {'size': len(dna_seq), 'symbols': symbols})
+            add_node(h, "re_contig", {"size": len(dna_seq), "symbols": symbols})
 
         hash_list = sorted(hash_list)
-        hash_seq = '_'.join(hash_list)
-        hash_contig_set = hashlib.sha256(hash_seq.encode('utf-8')).hexdigest()
+        hash_seq = "_".join(hash_list)
+        hash_contig_set = hashlib.sha256(hash_seq.encode("utf-8")).hexdigest()
 
-        node_contig_set = add_node(hash_contig_set, 're_contig_set', {})
-        for node in nodes['re_contig'].values():
-            add_edge(node_contig_set, node, 're_contig_set_has_contig', {})
-            
+        node_contig_set = add_node(hash_contig_set, "re_contig_set", {})
+        for node in nodes["re_contig"].values():
+            add_edge(node_contig_set, node, "re_contig_set_has_contig", {})
+
         return nodes, edges

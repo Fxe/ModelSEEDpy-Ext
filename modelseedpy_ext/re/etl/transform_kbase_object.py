@@ -5,7 +5,6 @@ logger = logging.getLogger(__name__)
 
 
 class TransformKBaseObjectInfo(ETLTransformGraph):
-
     def __init__(self):
         super().__init__()
 
@@ -26,7 +25,7 @@ class TransformKBaseObjectInfo(ETLTransformGraph):
 
                 return nodes[label][_node.id]
 
-            logger.error('add_node error')
+            logger.error("add_node error")
             return None
 
         def add_edge(node_from, node_to, label, data=None):
@@ -37,17 +36,21 @@ class TransformKBaseObjectInfo(ETLTransformGraph):
                 edges[label].append(_edge)
                 return _edge
 
-            logger.error('add_edge error')
+            logger.error("add_edge error")
             return None
 
-        node_type = add_node(info.type, 'kbase_type', data=None)
-        node_object = add_node(str(info).replace('/', '_'), 'kbase_object', {
-            'name': info.id,
-            'user': info.user,
-            'created': info.created_at,
-            'metadata': info.metadata
-        })
+        node_type = add_node(info.type, "kbase_type", data=None)
+        node_object = add_node(
+            str(info).replace("/", "_"),
+            "kbase_object",
+            {
+                "name": info.id,
+                "user": info.user,
+                "created": info.created_at,
+                "metadata": info.metadata,
+            },
+        )
 
-        add_edge(node_object, node_type, 'kbase_object_has_type')
+        add_edge(node_object, node_type, "kbase_object_has_type")
 
         return nodes, edges

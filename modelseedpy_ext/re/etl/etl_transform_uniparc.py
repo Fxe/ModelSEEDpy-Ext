@@ -5,7 +5,6 @@ logger = logging.getLogger(__name__)
 
 
 class ETLTransformUniparc(ETLTransformGraph):
-
     def __init__(self, protein_store):
         super().__init__()
         self.protein_store = protein_store
@@ -27,7 +26,7 @@ class ETLTransformUniparc(ETLTransformGraph):
 
                 return nodes[label][_node.id]
 
-            logger.error('add_node error')
+            logger.error("add_node error")
             return None
 
         def add_edge(node_from, node_to, label, data=None):
@@ -38,21 +37,23 @@ class ETLTransformUniparc(ETLTransformGraph):
                 edges[label].append(_edge)
                 return _edge
 
-            logger.error('add_edge error')
+            logger.error("add_edge error")
             return None
 
-        node_uniparc = add_node(entry['uniParcId'], 'uniparc', {
-            'uniParcCrossReferences': entry['uniParcCrossReferences']
-        })
+        node_uniparc = add_node(
+            entry["uniParcId"],
+            "uniparc",
+            {"uniParcCrossReferences": entry["uniParcCrossReferences"]},
+        )
 
         node_seq = None
-        if 'sequence' in entry and 'value' in entry['sequence']:
-            seq_hash = self.protein_store.store_sequence(entry['sequence']['value'])
-            node_seq = add_node(seq_hash, 're_seq_protein')
+        if "sequence" in entry and "value" in entry["sequence"]:
+            seq_hash = self.protein_store.store_sequence(entry["sequence"]["value"])
+            node_seq = add_node(seq_hash, "re_seq_protein")
         else:
-            logger.error('unable to find sequence')
+            logger.error("unable to find sequence")
 
         if node_seq:
-            add_edge(node_uniparc, node_seq, 'uniparc_has_protein_sequence')
+            add_edge(node_uniparc, node_seq, "uniparc_has_protein_sequence")
 
         return nodes, edges

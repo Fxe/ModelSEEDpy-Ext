@@ -1,5 +1,4 @@
 class Node:
-
     def __init__(self, key, label, data=None):
         self._key = key
         self.label = label
@@ -7,15 +6,14 @@ class Node:
 
     @property
     def key(self):
-        return self._key.replace(' ', '_')
+        return self._key.replace(" ", "_")
 
     @property
     def id(self):
-        return f'{self.label}/{self.key}'
+        return f"{self.label}/{self.key}"
 
 
 class ETLTransformGraph:
-
     def __init__(self):
         pass
 
@@ -26,9 +24,9 @@ class ETLTransformGraph:
     @staticmethod
     def transform_edge(src: Node, dst: Node, data=None):
         _edge = {
-            '_key': '{}:{}'.format(src.key, dst.key),
-            '_from': src,
-            '_to': dst,
+            "_key": "{}:{}".format(src.key, dst.key),
+            "_from": src,
+            "_to": dst,
         }
         if data:
             _edge.update(data)
