@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 class PanAnalysis:
 
+    DEFAULT_COMPLETENESS = 95
+
     def __init__(self, analysis_id, genomes, kbase_mags):
         self.id = analysis_id
         self.genomes = genomes
@@ -27,6 +29,7 @@ class PanAnalysis:
         self.cluster_functions_type = None
         self.function_to_clusters = None
         self.completeness = {}
+        self.motu_ret = None
 
         self.seq_annotation = None
         self.bad_seqs = None
@@ -34,7 +37,7 @@ class PanAnalysis:
 
     def index_kbase_mags(self, kbase_api):
         for object_id in self.kbase_mags:
-            object_id = object_id + '.RAST' # dumb hack
+            object_id = object_id + '.RAST'  # dumb hack
             genome = kbase_api.get_from_ws(object_id, 132089)
             genome_faa_filename = f'{os.path.abspath(self.id)}/{genome.id}.faa'
             genome.to_fasta(genome_faa_filename)
@@ -53,28 +56,41 @@ class PanAnalysis:
                             self.function_to_clusters[nmz_role] = set()
                         self.function_to_clusters[nmz_role].add(cluster_id)
 
-    def run_motu(self) -> DataFrame:
-        output_motu_file = f'{os.path.abspath(self.id)}/motu_output.txt'
-        if not os.path.exists(output_motu_file):
-            input_faa_file = f'{self.id}/motu_input.txt'
+    def run_motu(self, force_rerun=False, motu_input='motu_input.txt',
+                 motu_output='motu_output.txt', motu_completeness='motu_completeness_input.txt') -> DataFrame:
+        output_motu_file = f'{os.path.abspath(self.id)}/{motu_output}'
+        if not os.path.exists(output_motu_file) or force_rerun:
+            input_completeness_file = f'{self.id}/{motu_completeness}'
+            input_faa_file = f'{self.id}/{motu_input}'
             if not os.path.exists(input_faa_file):
                 logger.info(f'create mOTU input file {input_faa_file}')
+                genome_ids = set()
                 with open(input_faa_file, 'w') as fh:
                     for s in self.genomes:
+                        genome_ids.add(s)
                         fh.write(f'/home/fliu/mice/gtdb_prokka/{s}.faa\n')
                     for s in self.kbase_mags_faa:
+                        genome_ids.add(s)
                         fh.write(f'{s}\n')
+                logger.info(f'create mOTU input file {input_completeness_file}')
+                with open(input_completeness_file, 'w') as fh:
+                    fh.write('genome_id\tcompleteness\tcontamination\n')
+                    for genome_id in genome_ids:
+                        completeness = self.completeness.get(genome_id, PanAnalysis.DEFAULT_COMPLETENESS)
+                        contamination = 0
+                        fh.write(f'{genome_id}\t{completeness}\t{contamination}\n')
 
             cmd = [
                 "python3",
                 "/home/fliu/python3/mOTUlizer/mOTUlizer/bin/mOTUpan.py",
+                '--checkm', input_completeness_file,
                 '--txt',
                 '--faas', os.path.abspath(input_faa_file),
                 '--output', output_motu_file
             ]
 
             logger.info(f'running mOTU {cmd}')
-            ret = subprocess.run(cmd, capture_output=True)
+            self.motu_ret = subprocess.run(cmd, capture_output=True)
 
         self.df_motu_output = pd.read_csv(output_motu_file, sep='\t', comment='#', index_col=0)
 

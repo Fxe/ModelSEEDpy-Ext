@@ -1,12 +1,14 @@
 from modelseedpy.core.msatpcorrection import MSATPCorrection
 from modelseedpy.core.msgenome import normalize_role
 
+
 class Profiler:
     
     def __init__(self, master):
         self.master = master
         pass
-    
+
+
 class PathwayModuleProfiler:
     
     def __init__(self, master):
@@ -14,7 +16,8 @@ class PathwayModuleProfiler:
         
     def profile_genome(self, genome_id):
         pass
-    
+
+
 class FunctionProfiler:
     
     def __init__(self, master):
@@ -32,6 +35,7 @@ class FunctionProfiler:
                 if genome_id not in nmz_to_genome_gene[nmz]:
                     nmz_to_genome_gene[nmz][genome_id] = set()
                 nmz_to_genome_gene[nmz][genome_id].add(f.id)
+
 
 class AtpCoreProfiler:
     
@@ -96,7 +100,8 @@ class AtpCoreProfiler:
                             #print('reject', media_id)
                 res[media_id] = atp_val
         return res, media_out
-                
+
+
 class AtpCoreGapfillProfiler:
     
     def __init__(self, master, atp_hydrolysis_id):
@@ -142,7 +147,8 @@ class AtpCoreGapfillProfiler:
     
     def profile(self):
         pass
-    
+
+
 class GeProf:
     
     def __init__(self, genome_ids, fn_get_model, fn_get_genome, genome_order = None):
