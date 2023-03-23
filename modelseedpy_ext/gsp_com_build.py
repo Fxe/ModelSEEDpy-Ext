@@ -186,10 +186,10 @@ class GSPComBuilder:
                     # print(r)
                     pass
             model_com.add_reactions(reactions)
-            exchanges = MSBuilder.build_exchanges(model_com, "e" + token)
-            print("added ", len(exchanges), token)
-        exchanges = MSBuilder.build_exchanges(model_com, "e0")
-        print("added ", len(exchanges), "e0")
+            MSBuilder.add_exchanges_to_model(model_com, 'e' + token)
+
+        MSBuilder.add_exchanges_to_model(model_com, 'e0')
+        print('Exchanges ', len(model_com.exchanges), 'e0')
 
         r_bio_sum = Reaction("bio1", "bio_com", "", 0, 1000)
         r_bio_sum.add_metabolites(
