@@ -1,4 +1,4 @@
-import lxml.etree as ET
+import lxml.etree as et
 from enum import Enum
 
 
@@ -108,7 +108,7 @@ class BiocycPathwayParser:
         return res
 
     def parse(self, fh):
-        parser = ET.iterparse(fh, events=("end", "start"))
+        parser = et.iterparse(fh, events=("end", "start"))
         for action, elem in parser:
             tag = elem.tag
             if action == "start" and tag == 'Pathway':
@@ -154,7 +154,8 @@ class BiocycParseBase:
         self.end_tag = end_tag
         self.tag_capture = {}
 
-    def parse(self, elem, parser):
+    def _parse(self, elem, parser):
+        body = dict(elem.attrib)
         res = {}
         for action, elem in parser:
             t = (action, elem.tag)
@@ -163,7 +164,7 @@ class BiocycParseBase:
                 p, method = self.tag_capture[t]
                 d = p.parse(elem, parser)
                 attr = None
-                if attr == None:
+                if attr is None:
                     attr = t[1]
                 if method == XmlParseMethod.UNIQUE:
                     if attr in res:
@@ -182,7 +183,7 @@ class BiocycParseBase:
                 else:
                     raise Exception(f'method not implemented {method}')
             elif action == 'end' and elem.tag == self.end_tag:
-                return res
+                return body, res
             else:
                 raise Exception(f'bad traversal expected: {self.tag_capture.keys()}, found {t}')
 
@@ -281,14 +282,14 @@ class BiocycReactionParser:
         return res
 
     def parse(self, fh):
-        parser = ET.iterparse(fh, events=("end", "start"))
+        parser = et.iterparse(fh, events=("end", "start"))
         for action, elem in parser:
             tag = elem.tag
             if action == "start" and tag == 'Reaction':
                 return self._parse(elem, parser)
 
 
-class BiocycProteinParser():
+class BiocycProteinParser:
 
     def __init__(self):
         self.end_tag = 'Protein'
@@ -298,7 +299,7 @@ class BiocycProteinParser():
             ('start', 'synonym'): (BiocycParserSingle('synonym', 'synonym'), XmlParseMethod.UNIQUE),
             ('start', 'common-name'): (BiocycParserSingle('common-name', 'common-name'), XmlParseMethod.UNIQUE),
             ('start', 'molecular-weight-seq'): (
-            BiocycParserSingle('molecular-weight-seq', 'molecular-weight-seq'), XmlParseMethod.UNIQUE),
+                BiocycParserSingle('molecular-weight-seq', 'molecular-weight-seq'), XmlParseMethod.UNIQUE),
             ('start', 'species'): (BiocycParserPass('species'), XmlParseMethod.UNIQUE),
             ('start', 'catalyzes'): (BiocycParserPass('catalyzes'), XmlParseMethod.UNIQUE),
             ('start', 'credits'): (BiocycParserPass('credits'), XmlParseMethod.UNIQUE),
@@ -339,8 +340,60 @@ class BiocycProteinParser():
                 raise Exception(f'bad traversal expected: {self.tag_capture.keys()}, found {t}')
 
     def parse(self, fh):
-        parser = ET.iterparse(fh, events=("end", "start"))
+        parser = et.iterparse(fh, events=("end", "start"))
         for action, elem in parser:
             tag = elem.tag
             if action == "start" and tag == 'Protein':
                 return self._parse(elem, parser)
+
+
+class BiocycParseTag:
+
+    def __init__(self, tag):
+        self.tag = tag
+
+    def parse(self, elem, parser):
+        attr = dict(elem.attrib)
+        text = elem.text
+        for action, elem in parser:
+            if action == 'end' and elem.tag == self.tag:
+                return attr, text
+            else:
+                raise Exception(f'Element [{self.tag}] contains sub element [{elem.tag}]')
+
+
+class BiocycXmlParser(BiocycParseBase):
+
+    def __init__(self, tag):
+        super().__init__(tag)
+        self.tag = tag
+
+    def parse(self, h):
+        parser = et.iterparse(h, events=("end", "start"))
+        for action, elem in parser:
+            tag = elem.tag
+            if action == "start" and elem.tag == self.tag:
+                return super()._parse(elem, parser)
+
+
+class BiocycCompoundParser(BiocycXmlParser):
+
+    def __init__(self):
+        super().__init__('Compound')
+        self.tag_capture = {
+            ('start', 'parent'): (BiocycParserSingle('Compound', 'parent'), XmlParseMethod.LIST),
+            ('start', 'cml'): (BiocycParserPass('cml'), XmlParseMethod.UNIQUE),
+            ('start', 'appears-in-right-side-of'): (
+                BiocycParserPass('appears-in-right-side-of'), XmlParseMethod.UNIQUE),
+            ('start', 'inchi'): (BiocycParseTag('inchi'), XmlParseMethod.UNIQUE),
+            ('start', 'synonym'): (BiocycParseTag('synonym'), XmlParseMethod.LIST),
+            ('start', 'molecular-weight'): (BiocycParseTag('molecular-weight'), XmlParseMethod.UNIQUE),
+            ('start', 'monoisotopic-mw'): (BiocycParseTag('monoisotopic-mw'), XmlParseMethod.UNIQUE),
+            ('start', 'dblink'): (BiocycParserDblink(), XmlParseMethod.LIST),
+            ('start', 'inchi-key'): (BiocycParserPass('inchi-key'), XmlParseMethod.UNIQUE),
+            ('start', 'common-name'): (BiocycParseTag('common-name'), XmlParseMethod.UNIQUE),
+            ('start', 'gibbs-0'): (BiocycParserPass('gibbs-0'), XmlParseMethod.UNIQUE),
+            ('start', 'credits'): (BiocycParserPass('credits'), XmlParseMethod.UNIQUE),
+            ('start', 'comment'): (BiocycParserPass('comment'), XmlParseMethod.UNIQUE),
+            ('start', 'appears-in-left-side-of'): (BiocycParserPass('appears-in-left-side-of'), XmlParseMethod.UNIQUE),
+        }
