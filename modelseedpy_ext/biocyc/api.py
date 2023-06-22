@@ -85,11 +85,14 @@ class BiocycAPICached(BiocycAPI):
 
     @staticmethod
     def _to_frame_id_file(frame_id):
-        return frame_id.replace('+', '__PLUS__')
+        res = frame_id.replace('+', '__PLUS__')
+        if res.startswith('-'):
+            res = res.replace('-', '__MINUS__', 1)
+        return res
 
     @staticmethod
     def _from_frame_id_file(frame_id):
-        return frame_id.replace('__PLUS__', '+')
+        return frame_id.replace('__PLUS__', '+').replace('__MINUS__', '-')
 
     def cache_fetch(self, frame_id):
         if not os.path.exists(f'{self.cache}/{self.db}'):
