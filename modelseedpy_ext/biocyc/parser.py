@@ -188,27 +188,6 @@ class BiocycParseBase:
                 raise Exception(f'bad traversal expected: {self.tag_capture.keys()}, found {t}')
 
 
-class BiocycParseEnzymaticReaction(BiocycParseBase):
-
-    def __init__(self):
-        super().__init__('Enzymatic-Reaction')
-        self.tag_capture = {
-            ('start', 'enzyme'): (BiocycParserSingle('Protein', 'enzyme'), XmlParseMethod.UNIQUE),
-            ('start', 'reaction'): (BiocycParserSingle('Reaction', 'reaction'), XmlParseMethod.UNIQUE),
-            ('start', 'common-name'): (BiocycParserSingle('common-name', 'common-name'), XmlParseMethod.UNIQUE_E),
-        }
-
-
-class BiocycParseEnzymaticReactions(BiocycParseBase):
-
-    def __init__(self):
-        super().__init__('enzymatic-reaction')
-        self.tag_capture = {
-            ('start', 'Enzymatic-Reaction'): (BiocycParseEnzymaticReaction(), XmlParseMethod.LIST),
-            ('end', 'Enzymatic-Reaction'): None,
-        }
-
-
 class BiocycParserDblink:
 
     def __init__(self):
@@ -242,51 +221,93 @@ class BiocycParserPass:
                 return None
 
 
-class BiocycReactionParser:
+class BiocycParseReactionEnzymaticReaction(BiocycParseBase):
 
     def __init__(self):
+        super().__init__('Enzymatic-Reaction')
         self.tag_capture = {
-            ('start', 'parent'): BiocycParserSingle('Reaction', 'parent'),
-            ('start', 'left'): BiocycParserSingle('Compound', 'left'),
-            ('start', 'right'): BiocycParserSingle('Compound', 'right'),
-            ('start', 'dblink'): BiocycParserDblink(),
-            ('start', 'enzymatic-reaction'): BiocycParseEnzymaticReactions(),
-            # ('start', 'reaction-ordering'): _parse_reaction_ordering,
-            # ('start', 'species'): _parse_reaction_species,
-            # ('start', 'reaction-layout'): _parse_reaction_layout,
-            # ('start', 'reaction-list'): _parse_reaction_list,
+            ('start', 'enzyme'): (BiocycParseSubElements('enzyme', ['Protein'], True), XmlParseMethod.UNIQUE),
+            ('start', 'reaction'): (BiocycParseSubElements('reaction', ['Reaction'], True), XmlParseMethod.UNIQUE),
+            ('start', 'common-name'): (BiocycParseTag('common-name'), XmlParseMethod.UNIQUE),
+            ('start', 'synonym'): (BiocycParseTag('synonym'), XmlParseMethod.UNIQUE),
         }
 
-    def _parse(self, elem, parser):
-        res = {
-            'parent': [],
-            'left': [],
-            'right': [],
-            'dblink': [],
+    def parse(self, elem, parser):
+        return self._parse(elem, parser)
+
+
+class BiocycParseReactionEnzymaticReactions(BiocycParseBase):
+
+    def __init__(self):
+        super().__init__('enzymatic-reaction')
+        self.tag_capture = {
+            ('start', 'Enzymatic-Reaction'): (BiocycParseReactionEnzymaticReaction(), XmlParseMethod.LIST),
         }
+
+    def parse(self, elem, parser):
+        return self._parse(elem, parser)
+
+
+class BiocycParseSubElements:
+
+    def __init__(self, end_tag, tags, single: bool):
+        self.tags = tags
+        self.end_tag = end_tag
+        self.single = single
+
+    def parse(self, elem, parser):
+        attr = dict(elem.attrib)
+        text = elem.text
+        sub_elements = []
         for action, elem in parser:
-            tag = elem.tag
-            t = (action, tag)
-            # print('_parse', action, tag)
-            if t in self.tag_capture:
-                if tag == 'parent':
-                    res['parent'].append(self.tag_capture[t].parse(elem, parser))
-                elif tag == 'left':
-                    res['left'].append(self.tag_capture[t].parse(elem, parser))
-                elif tag == 'right':
-                    res['right'].append(self.tag_capture[t].parse(elem, parser))
-                elif tag == 'dblink':
-                    res['dblink'].append(self.tag_capture[t].parse(elem, parser))
+            if action == 'end' and elem.tag == self.end_tag:
+                return attr, text, sub_elements
+            elif action == 'start' and elem.tag in self.tags:
+                attr, text = BiocycParseTag(elem.tag).parse(elem, parser)
+                if self.single and len(sub_elements) > 0:
+                    raise Exception('multiple sub elements')
                 else:
-                    res[t[1]] = self.tag_capture[t].parse(elem, parser)
-        return res
+                    sub_elements.append((attr, text))
+            elif action == 'end' and elem.tag in self.tags:
+                pass
+            else:
+                raise Exception(f'Bad element [{elem.tag}] expected either {self.tags}')
 
-    def parse(self, fh):
-        parser = et.iterparse(fh, events=("end", "start"))
+
+class BiocycParseReactionLeftRight:
+
+    def parse(self, elem, parser):
+        species = None
+        compartment = None
+        coefficient = None
+        if elem.tag != 'left' and elem.tag != 'right':
+            raise Exception(f'Invalid element [{elem.tag}] expected either [left, right]')
+
         for action, elem in parser:
-            tag = elem.tag
-            if action == "start" and tag == 'Reaction':
-                return self._parse(elem, parser)
+            if action == 'end' and elem.tag == 'left' or elem.tag == 'right':
+                return species, compartment, coefficient
+            elif action == 'start' and elem.tag in ['Compound', 'Protein']:
+                if species is None:
+                    attr, text = BiocycParseTag(elem.tag).parse(elem, parser)
+                    species = attr
+                else:
+                    raise Exception(f'Found multiple species')
+            elif action == 'start' and elem.tag == 'compartment':
+                if compartment is None:
+                    attr, text, sub_elements = BiocycParseSubElements('compartment', ['cco'], True).parse(elem, parser)
+                    compartment = sub_elements[0]
+                else:
+                    raise Exception(f'Found multiple compartment')
+            elif action == 'start' and elem.tag == 'coefficient':
+                if coefficient is None:
+                    attr, text = BiocycParseTag(elem.tag).parse(elem, parser)
+                    coefficient = text
+                else:
+                    raise Exception(f'Found multiple coefficient')
+            elif action == 'end':
+                pass
+            else:
+                raise Exception(f'Bad element [{elem.tag}]')
 
 
 class BiocycProteinParser:
@@ -396,4 +417,30 @@ class BiocycCompoundParser(BiocycXmlParser):
             ('start', 'credits'): (BiocycParserPass('credits'), XmlParseMethod.UNIQUE),
             ('start', 'comment'): (BiocycParserPass('comment'), XmlParseMethod.UNIQUE),
             ('start', 'appears-in-left-side-of'): (BiocycParserPass('appears-in-left-side-of'), XmlParseMethod.UNIQUE),
+        }
+
+
+class BiocycReactionParser(BiocycXmlParser):
+
+    def __init__(self):
+        super().__init__('Reaction')
+        self.tag_capture = {
+            ('start', 'parent'): (BiocycParserSingle('Reaction', 'parent'), XmlParseMethod.LIST),
+            ('start', 'left'): (BiocycParseReactionLeftRight(), XmlParseMethod.LIST),
+            ('start', 'right'): (BiocycParseReactionLeftRight(), XmlParseMethod.LIST),
+            ('start', 'reaction-ordering'): (BiocycParserPass('reaction-ordering'), XmlParseMethod.UNIQUE),
+            ('start', 'enzymes-not-used'): (BiocycParserPass('enzymes-not-used'), XmlParseMethod.UNIQUE),
+            ('start', 'enzymatic-reaction'): (BiocycParseReactionEnzymaticReactions(), XmlParseMethod.UNIQUE),
+            ('start', 'dblink'): (BiocycParserDblink(), XmlParseMethod.LIST),
+            ('start', 'ec-number'): (BiocycParserPass('ec-number'), XmlParseMethod.UNIQUE),
+            ('start', 'reaction-list'): (BiocycParserPass('reaction-list'), XmlParseMethod.UNIQUE),
+            ('start', 'reaction-direction'): (BiocycParserPass('reaction-direction'), XmlParseMethod.UNIQUE),
+            ('start', 'orphan'): (BiocycParserPass('orphan'), XmlParseMethod.UNIQUE),
+            ('start', 'physiologically-relevant'): (
+                BiocycParserPass('physiologically-relevant'), XmlParseMethod.UNIQUE),
+            ('start', 'credits'): (BiocycParserPass('credits'), XmlParseMethod.UNIQUE),
+            ('start', 'in-pathway'): (BiocycParserPass('in-pathway'), XmlParseMethod.UNIQUE),
+            ('start', 'gibbs-0'): (BiocycParserPass('gibbs-0'), XmlParseMethod.UNIQUE),
+            ('start', 'comment'): (BiocycParserPass('comment'), XmlParseMethod.UNIQUE),
+            ('start', 'citation'): (BiocycParserPass('citation'), XmlParseMethod.LIST),
         }
