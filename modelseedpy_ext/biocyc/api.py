@@ -3,6 +3,7 @@ import requests
 from io import BytesIO
 import lxml.etree as et
 from enum import Enum
+import urllib.parse
 
 
 class BiocycQuery(Enum):
@@ -60,7 +61,8 @@ class BiocycAPI:
             return requests
 
     def fetch(self, frame_id, detail='high'):
-        resp = self.get_session().get(f'{self.end_point}/getxml?id={self.db}:{frame_id}&detail={detail}')
+        _frame_id = urllib.parse.quote(frame_id)
+        resp = self.get_session().get(f'{self.end_point}/getxml?id={self.db}:{_frame_id}&detail={detail}')
         return resp.content
 
     def query(self, biocyc_query: BiocycQuery, detail='none'):
@@ -83,22 +85,11 @@ class BiocycAPICached(BiocycAPI):
         self.cache = cache
         super().__init__(db, email, password)
 
-    @staticmethod
-    def _to_frame_id_file(frame_id):
-        res = frame_id.replace('+', '__PLUS__')
-        if res.startswith('-'):
-            res = res.replace('-', '__MINUS__', 1)
-        return res
-
-    @staticmethod
-    def _from_frame_id_file(frame_id):
-        return frame_id.replace('__PLUS__', '+').replace('__MINUS__', '-')
-
     def cache_fetch(self, frame_id):
         if not os.path.exists(f'{self.cache}/{self.db}'):
             return None
 
-        frame_file = self._to_frame_id_file(frame_id) + '.xml'
+        frame_file = frame_id + '.xml'
         for d in os.listdir(f'{self.cache}/{self.db}'):
             path = f'{self.cache}/{self.db}/{d}'
             if os.path.isdir(path):
@@ -113,7 +104,7 @@ class BiocycAPICached(BiocycAPI):
             os.mkdir(f'{self.cache}/{self.db}')
         if not os.path.exists(f'{self.cache}/{self.db}/{object_type}'):
             os.mkdir(f'{self.cache}/{self.db}/{object_type}')
-        frame_file = self._to_frame_id_file(frame_id) + '.xml'
+        frame_file = frame_id + '.xml'
         with open(f'{self.cache}/{self.db}/{object_type}/{frame_file}', 'wb') as fh:
             fh.write(data)
 
@@ -143,7 +134,6 @@ class BiocycAPICached(BiocycAPI):
         else:
             data = super().fetch(frame_id, detail)
             object_type = _detect_class(data)
-            print(object_type)
             self.cache_store(frame_id, data, object_type)
 
             return data
@@ -151,7 +141,6 @@ class BiocycAPICached(BiocycAPI):
     def query(self, biocyc_query: BiocycQuery, detail='none'):
         items = self.cache_query(biocyc_query)
         if items is None:
-            print('loading!!')
             items = super().query(biocyc_query, detail)
             self.save_query(biocyc_query, items)
 
