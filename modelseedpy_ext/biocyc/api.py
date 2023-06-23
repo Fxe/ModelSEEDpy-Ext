@@ -118,7 +118,7 @@ class BiocycAPICached(BiocycAPI):
             return None
         if not os.path.exists(f'{self.cache}/{self.db}/query'):
             return None
-        if not os.path.exists(f'{self.cache}/{self.db}/query/{biocyc_query.name}.txt'):
+        if not os.path.exists(f'{self.cache}/{self.db}/query/{biocyc_query.name}.json'):
             return None
         with open(f'{self.cache}/{self.db}/query/{biocyc_query.name}.json', 'r') as fh:
             return json.load(fh)
