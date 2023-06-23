@@ -1,9 +1,11 @@
 import os
 import requests
+import json
 from io import BytesIO
 import lxml.etree as et
 from enum import Enum
 import urllib.parse
+from modelseedpy_ext.utils import sha_hex
 
 
 class BiocycQuery(Enum):
@@ -12,7 +14,8 @@ class BiocycQuery(Enum):
     Compounds = 'Compound'
     Proteins = 'Protein'
     Genes = 'Gene'
-    Organisms = 'Organism'
+    Organisms = 'Organism',
+    RNAs = 'RNA'
 
 
 def _detect_class(data):
@@ -74,9 +77,11 @@ class BiocycAPI:
 
         resp = self.get_session().get(f'{self.end_point}/xmlquery?query={q}&detail={detail}')
 
-        items = _to_list(resp.content)
+        frame_ids = {o[0]['frameid'] for o in _to_list(resp.content)[biocyc_query.value]}
 
-        return {o[0]['frameid'] for o in items[biocyc_query.value]}
+        items = {frame_id: sha_hex(frame_id) for frame_id in frame_ids}
+
+        return items
 
 
 class BiocycAPICached(BiocycAPI):
@@ -89,7 +94,7 @@ class BiocycAPICached(BiocycAPI):
         if not os.path.exists(f'{self.cache}/{self.db}'):
             return None
 
-        frame_file = frame_id + '.xml'
+        frame_file = sha_hex(frame_id) + '.xml'
         for d in os.listdir(f'{self.cache}/{self.db}'):
             path = f'{self.cache}/{self.db}/{d}'
             if os.path.isdir(path):
@@ -104,7 +109,7 @@ class BiocycAPICached(BiocycAPI):
             os.mkdir(f'{self.cache}/{self.db}')
         if not os.path.exists(f'{self.cache}/{self.db}/{object_type}'):
             os.mkdir(f'{self.cache}/{self.db}/{object_type}')
-        frame_file = frame_id + '.xml'
+        frame_file = sha_hex(frame_id) + '.xml'
         with open(f'{self.cache}/{self.db}/{object_type}/{frame_file}', 'wb') as fh:
             fh.write(data)
 
@@ -115,17 +120,16 @@ class BiocycAPICached(BiocycAPI):
             return None
         if not os.path.exists(f'{self.cache}/{self.db}/query/{biocyc_query.name}.txt'):
             return None
-        with open(f'{self.cache}/{self.db}/query/{biocyc_query.name}.txt', 'r') as fh:
-            return fh.read().split()
+        with open(f'{self.cache}/{self.db}/query/{biocyc_query.name}.json', 'r') as fh:
+            return json.load(fh)
 
-    def save_query(self, biocyc_query: BiocycQuery, items):
+    def save_query(self, biocyc_query: BiocycQuery, items: dict):
         if not os.path.exists(f'{self.cache}/{self.db}'):
             os.mkdir(f'{self.cache}/{self.db}')
         if not os.path.exists(f'{self.cache}/{self.db}/query'):
             os.mkdir(f'{self.cache}/{self.db}/query')
-        with open(f'{self.cache}/{self.db}/query/{biocyc_query.name}.txt', 'w') as fh:
-            for i in items:
-                fh.write(i + '\n')
+        with open(f'{self.cache}/{self.db}/query/{biocyc_query.name}.json', 'w') as fh:
+            fh.write(json.dumps(items, indent=2, sort_keys=True))
 
     def fetch(self, frame_id, detail='high'):
         data = self.cache_fetch(frame_id)
