@@ -14,7 +14,7 @@ class BiocycQuery(Enum):
     Compounds = 'Compound'
     Proteins = 'Protein'
     Genes = 'Gene'
-    Organisms = 'Organism',
+    Organisms = 'Organism'
     RNAs = 'RNA'
 
 
