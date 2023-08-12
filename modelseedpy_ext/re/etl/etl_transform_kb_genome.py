@@ -174,6 +174,7 @@ class ETLGenome(ETLTransformGraph):
         self.kbase = kbase
         self.transform_kbase_object = transform_kbase_object
         self.transform_contigs = transform_contigs
+        self.handle_path = handle_path
 
     def etl(self, genome):
         nodes = {}
@@ -222,9 +223,9 @@ class ETLGenome(ETLTransformGraph):
 
             i = str(assembly.info).replace("/", "_")
             self.kbase.download_file_from_kbase2(
-                assembly.fasta_handle_ref, f"{handle_path}/{i}"
+                assembly.fasta_handle_ref, f"{self.handle_path}/{i}"
             )
-            assembly_contigs = MSGenome.from_fasta(f"{handle_path}/{i}")
+            assembly_contigs = MSGenome.from_fasta(f"{self.handle_path}/{i}")
             contig_set = [x.seq for x in assembly_contigs.features]
 
             c_nodes, c_edges = self.transform_contigs.transform(contig_set)
