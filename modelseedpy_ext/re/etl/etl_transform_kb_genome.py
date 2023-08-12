@@ -169,7 +169,7 @@ class ETLTransformKBaseGenome(ETLTransformGraph):
 
 
 class ETLGenome(ETLTransformGraph):
-    def __init__(self, transform_kbase_object, transform_contigs, kbase):
+    def __init__(self, transform_kbase_object, transform_contigs, kbase, handle_path='/home/fliu/kbase/cache/handle'):
         super().__init__()
         self.kbase = kbase
         self.transform_kbase_object = transform_kbase_object
@@ -222,9 +222,9 @@ class ETLGenome(ETLTransformGraph):
 
             i = str(assembly.info).replace("/", "_")
             self.kbase.download_file_from_kbase2(
-                assembly.fasta_handle_ref, f"/home/fliu/kbase/cache/handle/{i}"
+                assembly.fasta_handle_ref, f"{handle_path}/{i}"
             )
-            assembly_contigs = MSGenome.from_fasta(f"/home/fliu/kbase/cache/handle/{i}")
+            assembly_contigs = MSGenome.from_fasta(f"{handle_path}/{i}")
             contig_set = [x.seq for x in assembly_contigs.features]
 
             c_nodes, c_edges = self.transform_contigs.transform(contig_set)
