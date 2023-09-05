@@ -5,7 +5,39 @@ from modelseedpy_ext.re.etl.etl_transform_graph import ETLTransformGraph
 logger = logging.getLogger(__name__)
 
 
-class ETLTransformContigSet(ETLTransformGraph):
+class ETLTransformContigSet:
+    def __init__(self, dna_store):
+        self.dna_store = dna_store
+        print('!')
+
+    def transform(self, contig_set):
+        G = TransformGraph()
+
+        hash_list = []
+        for dna_seq in contig_set:
+            symbols = {}
+            for o in dna_seq:
+                if o not in symbols:
+                    symbols[o] = 0
+                symbols[o] += 1
+            h = self.dna_store.store_sequence(dna_seq)
+            hash_list.append(h)
+            G.add_transform_node(h, "re_contig", 
+                                 data={"size": len(dna_seq), "symbols": symbols})
+
+        hash_list = sorted(hash_list)
+        hash_seq = "_".join(hash_list)
+        hash_contig_set = hashlib.sha256(hash_seq.encode("utf-8")).hexdigest()
+
+        node_contig_set = G.add_transform_node(hash_contig_set, "re_contig_set")
+        for node in G.t_nodes["re_contig"].values():
+            G.add_transform_edge(node_contig_set.id, node.id,
+                                "re_contig_set_has_contig")
+
+        return G
+
+
+class ETLTransformContigSetOld(ETLTransformGraph):
     def __init__(self, dna_store):
         super().__init__()
         self.dna_store = dna_store
