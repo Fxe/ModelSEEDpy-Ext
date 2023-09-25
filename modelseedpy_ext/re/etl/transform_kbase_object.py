@@ -1,10 +1,11 @@
 import logging
 from modelseedpy_ext.re.etl.etl_transform_graph import ETLTransformGraph
+from modelseedpy_ext.re.etl.transform_graph import TransformGraph
 
 logger = logging.getLogger(__name__)
 
 
-class TransformKBaseObjectInfo():
+class TransformKBaseObjectInfo:
     def __init__(self):
         pass
 
@@ -12,16 +13,15 @@ class TransformKBaseObjectInfo():
         G = TransformGraph()
 
         node_type = G.add_transform_node(info.type, "kbase_type", data=None)
-        node_info = G.add_transform_node(str(info).replace("/", "_"), 
-                     "kbase_object", 
-                     {
-                         "name": info.id,
-                      "user": info.user,
-                "created": info.created_at,
-                "metadata": info.metadata,
-            })
-        
-        G.add_transform_edge(node_info.id, node_type.id, 
+        node_info = G.add_transform_node(str(info).replace("/", "_"),
+                                         "kbase_object",
+                                         {"name": info.id,
+                                          "user": info.user,
+                                          "created": info.created_at,
+                                          "metadata": info.metadata,
+                                          })
+
+        G.add_transform_edge(node_info.id, node_type.id,
                              "kbase_object_has_type")
 
         return G

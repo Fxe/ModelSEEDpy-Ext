@@ -1,7 +1,35 @@
+import logging
 from mOTUlizer.classes.MetaBin import MetaBin
 from math import log10
 
+
+logging.getLogger(__name__)
+
 mean = lambda x : sum(x)/len(x)
+
+
+def load_mmseq_results(mmseqs_dat, precluster, mmseqs2, name):
+    with open(mmseqs_dat) as handle:
+        if precluster:
+            recs = {g: l[:-1].split()[0] for l in handle for g in precluster[l[:-1].split()[1]]}
+        else:
+            recs = {l[:-1].split()[1]: l[:-1].split()[0] for l in handle}
+
+    fill = len(str(len(set(recs.values()))))
+    rep2clust = {k: name + str(i).zfill(fill) for i, k in enumerate(set(recs.values()))}
+    gene_clusters2rep = {v: k for k, v in rep2clust.items()}
+
+    logging.debug(f'For {len(recs)} CDSes we got {len(gene_clusters2rep)}  gene-clusters')
+
+    recs = {k: rep2clust[v] for k, v in recs.items()}
+    genome2gene_clusters = {k.id: set() for k in mmseqs2.genomes}
+
+    for k, v in recs.items():
+        g = mmseqs2.feature_genome[k]
+        genome2gene_clusters[g.id].add(v)
+
+    return genome2gene_clusters, recs, gene_clusters2rep
+
 
 class FastMOTU:
     
@@ -115,3 +143,60 @@ class FastMOTU:
             print(pp, file = sys.stderr)
         self.iterations = i -1
         return likelies
+
+    def get_stats(self):
+        output = {
+            "nb_genomes": len(self),
+            "core": list(self.core) if self.core else None,
+                     "aux_genome": [k for k, v in self.gene_clustersCounts.items() if
+                                    k not in self.core] if self.core else None,
+                     "singleton_gene_clusterss": [k for k, v in self.gene_clustersCounts.items() if k not in self.core
+                                                  if v == 1] if self.core else None,
+                     "gene_clusterss": None if self.gene_clusters_dict is None else {
+                         'genome': {k: list(v) for k, v in self.gene_clusters_dict.items()},
+                         'aa': self.aa2gene_clusters} if self.aa2gene_clusters else (
+                         {k: list(v) for k, v in self.gene_clusters_dict.items()} if self.gene_clusters_dict else None),
+                     "mean_ANI": self.get_mean_ani() if (
+                                 hasattr(self, 'fastani_dict') or all([hasattr(g, "genome") for g in self])) else None,
+                     "ANIs": [[k[0], k[1], v] for k, v in self.fastani_matrix().items()] if (
+                                 hasattr(self, 'fastani_dict') or all([hasattr(g, "genome") for g in self])) else None,
+                     "genomes": [v.get_data() for v in self],
+                     "likelies": self.likelies
+                     }
+        return output
+
+    def get_core_features(self, genomes, m_core, ontology='RAST', cov_cut=0.85):
+        cluster_to_features = {}
+        for f_id, c_id in self.aa2gene_clusters.items():
+            if c_id not in cluster_to_features:
+                cluster_to_features[c_id] = set()
+            cluster_to_features[c_id].add(f_id)
+        feature_id_to_genome = {}
+        for g_id, genome in genomes.items():
+            for f in genome.features:
+                if f.id not in feature_id_to_genome:
+                    feature_id_to_genome[f.id] = g_id
+                else:
+                    print('!!')
+
+        core_features = {}
+        for k in m_core:
+            l = len(cluster_to_features[k])
+            f_count = {}
+            for f_id in cluster_to_features[k]:
+                g_id = feature_id_to_genome[f_id]
+                genome = genomes[g_id]
+                feature = genome.features.get_by_id(f_id)
+                terms = feature.ontology_terms.get(ontology, [])
+                for t in terms:
+                    if t not in f_count:
+                        f_count[t] = 0
+                    f_count[t] += 1
+            f_per = {k:(v/l) for k,v in f_count.items()}
+            for f, cov in f_per.items():
+                if cov > cov_cut:
+                    if f not in core_features:
+                        core_features[f] = 0
+                    core_features[f] += 1
+
+        return core_features

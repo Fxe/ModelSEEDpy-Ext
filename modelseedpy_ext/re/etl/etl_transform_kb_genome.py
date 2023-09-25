@@ -1,6 +1,7 @@
 import hashlib
 import logging
 from Bio.Seq import Seq
+from modelseedpy import MSGenome
 from modelseedpy_ext.re.etl.etl_transform_graph import ETLTransformGraph
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,95 @@ def locate_feature_dna_sequence_in_contig(f, contigs):
     return ll
 
 
-class ETLTransformKBaseGenome(ETLTransformGraph):
+class ETLTransformKBaseGenome:
+
+    def __init__(self, transform_info, transform_contigs, kb_re, kbase):
+        self.transform_info = transform_info
+        self.transform_contigs = transform_contigs
+        self.kb_re = kb_re
+        self.kbase = kbase
+
+    def _process_contigs(self, assembly, handle_path='/scratch/fliu/data/kbase/handle/'):
+        i = str(assembly.info).replace("/", "_")
+        self.kbase.download_file_from_kbase2(
+            assembly.fasta_handle_ref, f"{handle_path}/{i}"
+        )
+        assembly_contigs = MSGenome.from_fasta(f"{handle_path}/{i}")
+        contig_set = [x.seq for x in assembly_contigs.features]
+
+        return contig_set
+
+    def _process_features(self, genome, n_genome_id, G):
+        seq_dna_hashes = []
+        seq_protein_hashes = []
+        for f in genome.features:
+            seq_dna = f.dna_sequence
+            seq_protein = f.protein_translation
+            h_dna = self.kb_re.dna_store.store_sequence(seq_dna)
+            h_protein = self.kb_re.protein_store.store_sequence(seq_protein)
+            seq_dna_hashes.append(h_dna)
+            seq_protein_hashes.append(h_protein)
+
+            node_seq_dna = G.add_transform_node(h_dna, "re_seq_dna")
+            node_seq_protein = G.add_transform_node(h_protein, "re_seq_protein")
+
+            G.add_transform_edge(n_genome_id, node_seq_dna.id, "ws_genome_has_seq_dna",
+                                 {'feature_id': f.id, 'location': f.location})
+            G.add_transform_edge(n_genome_id, node_seq_protein.id, "ws_genome_has_seq_protein",
+                                 {'feature_id': f.id})
+
+            seq_translation = str(Seq(seq_dna).translate())[:-1]
+            if seq_translation == seq_protein:
+                G.add_transform_edge(node_seq_dna.id, node_seq_protein.id,
+                                     "re_seq_dna_has_translation")
+            else:
+                G.add_transform_edge(node_seq_dna.id, node_seq_protein.id,
+                                     "re_seq_dna_has_partial_translation")
+
+        hash_dna_set = hashlib.sha256(
+            "_".join(sorted(seq_dna_hashes)).encode("utf-8")
+        ).hexdigest()
+        hash_protein_set = hashlib.sha256(
+            "_".join(sorted(seq_protein_hashes)).encode("utf-8")
+        ).hexdigest()
+
+        node_seq_dna_set = G.add_transform_node(hash_dna_set, "re_seq_dna_set")
+        node_seq_protein_set = G.add_transform_node(hash_protein_set, "re_seq_protein_set")
+
+        G.add_transform_edge(n_genome_id, node_seq_dna_set.id,
+                             "ws_genome_has_seq_dna_set")
+        G.add_transform_edge(n_genome_id, node_seq_protein_set.id,
+                             "ws_genome_has_seq_protein_set")
+
+    def transform(self, genome):
+        assembly = self.kbase.get_from_ws(genome.assembly_ref)
+
+        contig_set = self._process_contigs(assembly)
+
+        g_contigs = self.transform_contigs.transform(contig_set)
+
+        g_genome_info = self.transform_info.transform(genome.info)
+        g_assembly_info = self.transform_info.transform(assembly.info)
+
+        n_contig_set_id = list(g_contigs.t_nodes['re_contig_set'])[0]
+
+        n_assembly_id = list(g_assembly_info.t_nodes['kbase_object'])[0]
+        n_genome_id = list(g_genome_info.t_nodes['kbase_object'])[0]
+
+        g_compose = g_genome_info.concat(g_assembly_info)
+        g_compose = g_compose.concat(g_contigs)
+        g_compose.add_transform_edge(n_genome_id, n_assembly_id,
+                                     "kbase_object_has_object_reference",
+                                     {"value": "assembly_ref"})
+        g_compose.add_transform_edge(n_assembly_id, n_contig_set_id,
+                                     "kbase_object_has_re_contig_set")
+
+        self._process_features(genome, n_genome_id, g_compose)
+
+        return g_compose
+
+
+class ETLTransformKBaseGenomeOld(ETLTransformGraph):
     def __init__(self, dna_store, protein_store):
         super().__init__()
         self.dna_store = dna_store

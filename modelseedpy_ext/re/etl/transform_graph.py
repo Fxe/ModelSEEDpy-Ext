@@ -66,5 +66,6 @@ class TransformGraph(DiGraph):
             self.t_nodes[label][node.id] = node
             self.add_node(node)
         else:
-            raise Exception('dup')
+            pass
+            #raise Exception('dup')
         return node

@@ -1,6 +1,7 @@
 import hashlib
 import logging
 from modelseedpy_ext.re.etl.etl_transform_graph import ETLTransformGraph
+from modelseedpy_ext.re.etl.transform_graph import TransformGraph
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class ETLTransformContigSet:
         node_contig_set = G.add_transform_node(hash_contig_set, "re_contig_set")
         for node in G.t_nodes["re_contig"].values():
             G.add_transform_edge(node_contig_set.id, node.id,
-                                "re_contig_set_has_contig")
+                                 "re_contig_set_has_contig")
 
         return G
 
