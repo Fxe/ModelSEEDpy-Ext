@@ -8,6 +8,7 @@ DEBUG = None
 
 
 class ETLLoadArangoDb:
+
     def __init__(self, arango_database):
         self.aql_upsert = """
         FOR d IN @docs
@@ -65,11 +66,13 @@ class ETLLoadArangoDb:
                 bin_vars = {"docs": to_load, "@col": collection_id}
                 self.db.AQLQuery(self.aql_upsert, bindVars=bin_vars)
 
-    def load(self, data):
+    @staticmethod
+    def load_old(data):
         nodes = data["nodes"]
         edges = data["edges"]
-        node_ids = self.load_nodes(nodes)
-        self.load_edges(edges, node_ids)
+        # node_ids = self.load_nodes(nodes)
+        # self.load_edges(edges, node_ids)
+        raise Exception("removed")
 
     def load_collection_nodes(self, G, collection_id):
         inserted_nodes = {}

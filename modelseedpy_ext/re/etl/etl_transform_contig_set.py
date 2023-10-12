@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 class ETLTransformContigSet:
     def __init__(self, dna_store):
         self.dna_store = dna_store
-        print('!')
 
     def transform(self, contig_set):
         G = TransformGraph()
