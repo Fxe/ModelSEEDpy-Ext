@@ -8,6 +8,27 @@ logging.getLogger(__name__)
 mean = lambda x : sum(x)/len(x)
 
 
+def get_core_features(cluster, feature_to_genome, genomes, cov_cut=0.85):
+    f_count = {}
+    core_features = None
+    for f_id in cluster:
+        g_id = feature_to_genome[f_id]
+        genome = genomes[g_id]
+
+        feature = genome.features.get_by_id(f_id)
+        terms = feature.ontology_terms.get('RAST', [])
+        for t in terms:
+            if t not in f_count:
+                f_count[t] = 0
+            f_count[t] += 1
+    l = len(cluster)
+    f_per = {k: (v / l) for k, v in f_count.items()}
+    for f, cov in f_per.items():
+        if cov > cov_cut:
+            core_features = f
+    return core_features
+
+
 def load_mmseq_results(mmseqs_dat, precluster, mmseqs2, name):
     with open(mmseqs_dat) as handle:
         if precluster:

@@ -1,5 +1,7 @@
 from modelseedpy.core.msatpcorrection import MSATPCorrection
 from modelseedpy.core.msgenome import normalize_role
+from cobra.core import Reaction
+from cobra.flux_analysis import pfba
 
 
 class Profiler:
@@ -103,6 +105,64 @@ class AtpCoreProfiler:
         return res, media_out
 
 
+class ProfilerAA:
+
+    def __init__(self, model):
+        self.model = model
+        self.amino_acids = {
+            'leu': 'leu__L_c',
+            'lys': 'lys__L_c',
+            'his': 'his__L_c',
+            'ile': 'ile__L_c',
+            'thr': 'thr__L_c',
+            'trp': 'trp__L_c',
+            'tyr': 'tyr__L_c',
+            'ser': 'ser__L_c',
+            'met': 'met__L_c',
+            'cys': 'cys__L_c',
+            'arg': 'arg__L_c',
+            'asn': 'asn__L_c',
+            'asp': 'asp__L_c',
+            'ala': 'ala__L_c',
+            'gln': 'gln__L_c',
+            'glu': 'glu__L_c',
+            'gly': 'gly_c',
+            'val': 'val__L_c',
+            'pro': 'pro__L_c',
+            'phe': 'phe__L_c',
+        }
+        self.test_reactions = {}
+
+    def build_tests(self):
+        for aa, cpd_id in self.amino_acids.items():
+            cpd = self.model.metabolites.get_by_id(cpd_id)
+            rxn_test = Reaction(f'test_{aa}', f'Test {cpd.id} [{cpd.name}]', 'TEST', 0, 0)
+            rxn_test.add_metabolites({
+                cpd: -1
+            })
+
+            if rxn_test.id not in self.model.reactions:
+                self.test_reactions[aa] = rxn_test
+        self.model.add_reactions(list(self.test_reactions.values()))
+
+    def profile_genome(self, genome_id):
+        result = {}
+        for test_id, r in self.test_reactions.items():
+            self.model.objective = r.id
+            model_reaction = self.reactions.get_by_id(r.id)
+            model_reaction.lower_bound = 0
+            model_reaction.upper_bound = 1
+            solution = pfba(self.model)
+            obj = solution.fluxes[r.id]
+            if obj > 0 and solution.status == 'optimal':
+                result[test_id] = solution
+            else:
+                result[r.id] = None
+            r.upper_bound = 0
+
+        return result
+
+
 class AtpCoreGapfillProfiler:
     def __init__(self, master, atp_hydrolysis_id):
         self.master = master
@@ -168,3 +228,63 @@ class GeProf:
 
     def profile(self):
         pass
+
+
+class TestModel:
+
+    def __init__(self, model):
+        self._model = model
+        self.test_reactions = None
+        self.test = None
+
+    def add_tests(self):
+        amino_acids = """
+        cpd00107_c0
+        cpd00039_c0
+        cpd00119_c0
+        cpd00322_c0
+        cpd00161_c0
+        cpd00065_c0
+        cpd00069_c0
+        cpd00054_c0
+        cpd00060_c0
+        cpd00084_c0
+        cpd00051_c0
+        cpd00132_c0
+        cpd00041_c0
+        cpd00035_c0
+        cpd00053_c0
+        cpd00023_c0
+        cpd00033_c0
+        cpd00156_c0
+        cpd00129_c0
+        cpd00066_c0
+        """
+        self.test = [self._model.metabolites.get_by_id(m) for m in amino_acids.split()]
+        from cobra.core import Reaction
+
+        for t in self.test:
+            rxn_test = Reaction(f'test_{t.id}', f'Test {t.name}', 'TEST', 0, 0)
+            rxn_test.add_metabolites({
+                t: -1
+            })
+            self.test_reactions[t] = rxn_test
+        self._model.add_reactions(self.test_reactions)
+
+        return self.test_reactions
+
+    def run_tests(self):
+        test_solutions = {}
+        for m, r in self.test_reactions.items():
+            self._model.objective = r.id
+            model_rxn = self._model.reactions.get_by_id(r.id)
+            model_rxn.upper_bound = 1
+            solution = cobra.flux_analysis.pfba(self._model)
+            obj = solution.fluxes[model_rxn.id]
+            if obj > 0 and solution.status == 'optimal':
+                test_solutions[model_rxn.id] = solution
+            else:
+                test_solutions[model_rxn.id] = None
+            model_rxn.upper_bound = 0
+
+        return test_solutions

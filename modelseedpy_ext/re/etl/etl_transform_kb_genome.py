@@ -79,6 +79,8 @@ class ETLTransformKBaseGenome:
     def _process_features(self, genome, n_genome_id, G):
         seq_dna_hashes = []
         seq_protein_hashes = []
+        list_nodes_seq_dna = []
+        list_nodes_seq_protein = []
         for f in genome.features:
             seq_dna = f.dna_sequence
             seq_protein = f.protein_translation
@@ -89,6 +91,9 @@ class ETLTransformKBaseGenome:
 
             node_seq_dna = G.add_transform_node(h_dna, "re_seq_dna")
             node_seq_protein = G.add_transform_node(h_protein, "re_seq_protein")
+
+            list_nodes_seq_dna.append(node_seq_dna)
+            list_nodes_seq_protein.append(node_seq_protein)
 
             G.add_transform_edge(n_genome_id, node_seq_dna.id, "ws_genome_has_seq_dna",
                                  {'feature_id': f.id, 'location': f.location})
@@ -112,6 +117,11 @@ class ETLTransformKBaseGenome:
 
         node_seq_dna_set = G.add_transform_node(hash_dna_set, "re_seq_dna_set")
         node_seq_protein_set = G.add_transform_node(hash_protein_set, "re_seq_protein_set")
+
+        for n in list_nodes_seq_dna:
+            G.add_transform_edge(node_seq_dna_set.id, n.id, "re_seq_dna_set_has_seq_dna")
+        for n in list_nodes_seq_protein:
+            G.add_transform_edge(node_seq_protein_set.id, n.id, "re_seq_protein_set_has_seq_protein")
 
         G.add_transform_edge(n_genome_id, node_seq_dna_set.id,
                              "ws_genome_has_seq_dna_set")
