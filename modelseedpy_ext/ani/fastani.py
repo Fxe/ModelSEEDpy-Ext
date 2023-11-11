@@ -63,13 +63,35 @@ def run_fastani(
     return fast_ani_result, output
 
 
-def get_contig_from_genome(genome):
+def get_contig_from_genome(genome, kbase):
     assembly = kbase.get_from_ws(genome.assembly_ref)
     return get_contig_from_assembly(assembly)
 
 
-def get_contig_from_assembly(assembly, token):
+def get_contig_from_assembly(assembly, token, kbase):
     file_id = assembly.fasta_handle_ref
     file_path = "/home/fliu/KE/data/"
     res = kbase.download_file_from_kbase(token, file_id, file_path)
     return res
+
+
+def build_fast_ani_library(genomes, kbase, output_path='library_ani.txt',
+                           kbase_cache='/scratch/fliu/data/kbase/cache/handle'):
+    assemblies = {}
+
+    for genome in genomes:
+        if genome.id not in assemblies:
+            assemblies[genome.id] = kbase.get_from_ws(genome.assembly_ref)
+        else:
+            print('dup', genome.id)
+
+    with open(output_path, 'w') as fh:
+        for genome_id, a in assemblies.items():
+            fasta_handle_ref = a.fasta_handle_ref
+            filename = f'{kbase_cache}/{fasta_handle_ref}'
+            if not os.path.exists(filename):
+                kbase.download_file_from_kbase2(fasta_handle_ref, filename)
+            else:
+                fh.write(filename + '\n')
+
+    return assemblies
