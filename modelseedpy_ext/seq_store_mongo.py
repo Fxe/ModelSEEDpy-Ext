@@ -131,5 +131,6 @@ def load_protein_seq_store_mongo(host, database):
         "Z",  # Glutamate or Glutamine
         "J",  # Leucine or Isoleucine
         "X",  # Any
+        "*"
     }
     return s
