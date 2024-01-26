@@ -1,6 +1,34 @@
 import logging
+import sys
 from mOTUlizer.classes.MetaBin import MetaBin
 from math import log10
+import networkx as nx
+
+
+def read_clusters_dict(filename, sep='\t'):
+    clusters = {}
+    with open(filename, 'r') as fh:
+        line = fh.readline()
+        while line:
+            if line:
+                rep, member = line.strip().split(sep)
+                if rep not in clusters:
+                    clusters[rep] = set()
+                clusters[rep].add(member)
+            line = fh.readline()
+        return clusters
+
+
+def read_clusters(filename, sep='\t'):
+    g = nx.Graph()
+    with open(filename, 'r') as fh:
+        line = fh.readline()
+        while line:
+            if line:
+                rep, member = line.strip().split(sep)
+                g.add_edge(rep, member)
+            line = fh.readline()
+        return g
 
 
 logging.getLogger(__name__)
@@ -29,6 +57,52 @@ def get_core_features(cluster, feature_to_genome, genomes, cov_cut=0.85):
     return core_features
 
 
+def load_mmseq_results3(clusters, genomes, name):
+    recs = clusters
+    features = {}
+
+    for g in genomes:
+        for f in g.features:
+            features[f.id] = g
+    fill = len(str(len(set(clusters.values()))))
+
+    rep2clust = {k: name + str(i).zfill(fill) for i, k in enumerate(set(recs.values()))}
+    gene_clusters2rep = {v: k for k, v in rep2clust.items()}
+
+    logging.debug(f'For {len(recs)} CDSes we got {len(gene_clusters2rep)}  gene-clusters')
+
+    recs = {k: rep2clust[v] for k, v in recs.items()}
+    genome2gene_clusters = {k.id: set() for k in genomes}
+
+    for k, v in recs.items():
+        g = features[k]
+        genome2gene_clusters[g.id].add(v)
+
+    return genome2gene_clusters, recs, gene_clusters2rep
+
+
+def load_mmseq_results4(clusters, feature_to_genome, genome_ids, name):
+    recs = clusters
+    fill = len(str(len(set(clusters.values()))))
+
+    rep2clust = {k: name + str(i).zfill(fill) for i, k in enumerate(set(recs.values()))}
+    gene_clusters2rep = {v: k for k, v in rep2clust.items()}
+
+    logging.debug(f'For {len(recs)} CDSes we got {len(gene_clusters2rep)}  gene-clusters')
+
+    recs = {k: rep2clust[v] for k, v in recs.items()}
+    genome2gene_clusters = {k.id: set() for k in genome_ids}
+
+    for k, v in recs.items():
+        g = feature_to_genome.get(k)
+        if g:
+            genome2gene_clusters[g.id].add(v)
+        else:
+            logging.warning(f'not found {k}')
+
+    return genome2gene_clusters, recs, gene_clusters2rep
+
+
 def load_mmseq_results(mmseqs_dat, precluster, mmseqs2, name):
     with open(mmseqs_dat) as handle:
         if precluster:
@@ -43,11 +117,11 @@ def load_mmseq_results(mmseqs_dat, precluster, mmseqs2, name):
     logging.debug(f'For {len(recs)} CDSes we got {len(gene_clusters2rep)}  gene-clusters')
 
     recs = {k: rep2clust[v] for k, v in recs.items()}
-    genome2gene_clusters = {k.id: set() for k in mmseqs2.genomes}
+    genome2gene_clusters = {genome.id: set() for genome in mmseqs2.genomes}
 
-    for k, v in recs.items():
-        g = mmseqs2.feature_genome[k]
-        genome2gene_clusters[g.id].add(v)
+    for feature_id, v in recs.items():
+        genome = mmseqs2.feature_genome[feature_id]
+        genome2gene_clusters[genome.id].add(v)
 
     return genome2gene_clusters, recs, gene_clusters2rep
 

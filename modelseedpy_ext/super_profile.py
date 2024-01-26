@@ -4,6 +4,92 @@ from cobra.core import Reaction
 from cobra.flux_analysis import pfba
 
 
+SEED_AA_FLAVOR = {
+            'pyr': 'cpd00020_c0',
+            'leu': 'cpd00107_c0',
+            'lys': 'cpd00039_c0',
+            'his': 'cpd00119_c0',
+            'ile': 'cpd00322_c0',
+            'thr': 'cpd00161_c0',
+            'trp': 'cpd00065_c0',
+            'tyr': 'cpd00069_c0',
+            'ser': 'cpd00054_c0',
+            'met': 'cpd00060_c0',
+            'cys': 'cpd00084_c0',
+            'arg': 'cpd00051_c0',
+            'asn': 'cpd00132_c0',
+            'asp': 'cpd00041_c0',
+            'ala': 'cpd00035_c0',
+            'gln': 'cpd00053_c0',
+            'glu': 'cpd00023_c0',
+            'gly': 'cpd00033_c0',
+            'val': 'cpd00156_c0',
+            'pro': 'cpd00129_c0',
+            'phe': 'cpd00066_c0',
+        }
+
+SEED_FLAVOR_2 = {
+            'glc': '',
+            'atp': 'cpd00002_c0',
+            'adp': 'cpd00008_c0',
+            'h2o': 'cpd00001_c0',
+            'h_c': 'cpd00067_c0',
+            'h_e': 'cpd00067_e0',
+            'pi': 'cpd00009_c0',
+            'nad': 'cpd00003_c0',
+            'nadh': 'cpd00004_c0',
+            'nadp': 'cpd00006_c0',
+            'nadph': 'cpd00005_c0',
+            'q8': 'cpd15560_c0',
+            'q8h2': 'cpd15561_c0',
+            'accoa': 'cpd00022_c0',
+            'ac': 'cpd00029_c0',
+            'coa': 'cpd00010_c0',
+        }
+
+BIGG_AA_FLAVOR = {
+            'pyr': 'pyr_c',
+            'leu': 'leu__L_c',
+            'lys': 'lys__L_c',
+            'his': 'his__L_c',
+            'ile': 'ile__L_c',
+            'thr': 'thr__L_c',
+            'trp': 'trp__L_c',
+            'tyr': 'tyr__L_c',
+            'ser': 'ser__L_c',
+            'met': 'met__L_c',
+            'cys': 'cys__L_c',
+            'arg': 'arg__L_c',
+            'asn': 'asn__L_c',
+            'asp': 'asp__L_c',
+            'ala': 'ala__L_c',
+            'gln': 'gln__L_c',
+            'glu': 'glu__L_c',
+            'gly': 'gly_c',
+            'val': 'val__L_c',
+            'pro': 'pro__L_c',
+            'phe': 'phe__L_c',
+        }
+
+BIGG_FLAVOR_2 = {
+            'glc': '',
+            'atp': 'atp_c',
+            'adp': 'adp_c',
+            'h2o': 'h2o_c',
+            'h': '',
+            'pi': 'pi_c',
+            'nad': 'nad_c',
+            'nadh': 'nadh_c',
+            'nadp': 'nadp_c',
+            'nadph': 'nadph_c',
+            'q8': 'q8_c',
+            'q8h2': 'q8h2_c',
+            'accoa': 'accoa_c',
+            'ac': 'ac_c',
+            'coa': 'coa_c',
+        }
+
+
 class Profiler:
     def __init__(self, master):
         self.master = master
@@ -109,29 +195,76 @@ class ProfilerAA:
 
     def __init__(self, model):
         self.model = model
-        self.amino_acids = {
-            'leu': 'leu__L_c',
-            'lys': 'lys__L_c',
-            'his': 'his__L_c',
-            'ile': 'ile__L_c',
-            'thr': 'thr__L_c',
-            'trp': 'trp__L_c',
-            'tyr': 'tyr__L_c',
-            'ser': 'ser__L_c',
-            'met': 'met__L_c',
-            'cys': 'cys__L_c',
-            'arg': 'arg__L_c',
-            'asn': 'asn__L_c',
-            'asp': 'asp__L_c',
-            'ala': 'ala__L_c',
-            'gln': 'gln__L_c',
-            'glu': 'glu__L_c',
-            'gly': 'gly_c',
-            'val': 'val__L_c',
-            'pro': 'pro__L_c',
-            'phe': 'phe__L_c',
-        }
+        self.amino_acids = BIGG_AA_FLAVOR
+        self.others = BIGG_FLAVOR_2
         self.test_reactions = {}
+
+    def build_synth_metabolite_test(self, metabolite):
+        if metabolite.id in self.model.metabolites:
+            m = self.model.metabolites.get_by_id(metabolite.id)
+            rxn_test = Reaction(f'test_{m.id}', f'Test {m.id} [{m.name}]', 'TEST', 0, 0)
+            rxn_test.add_metabolites({
+                m: -1
+            })
+            return rxn_test
+        else:
+            return None
+
+    def build_all_synth_test(self):
+        _to_add = []
+        for m in self.model.metabolites:
+            rxn_test = self.build_synth_metabolite_test(m)
+            if rxn_test.id not in self.model.reactions:
+                self.test_reactions[m.id] = rxn_test
+                _to_add.append(rxn_test)
+        self.model.add_reactions(_to_add)
+
+    def build_tests2(self):
+        rxn_test_atp = Reaction(f'test_atp', f'Test ATP', 'TEST', 0, 0)
+        rxn_test_atp.add_metabolites({
+            self.model.metabolites.get_by_id(self.others['h2o']): -1,
+            self.model.metabolites.get_by_id(self.others['atp']): -1,
+            self.model.metabolites.get_by_id(self.others['adp']): 1,
+            self.model.metabolites.get_by_id(self.others['pi']): 1,
+            self.model.metabolites.get_by_id(self.others['h_c']): 1,
+        })
+        rxn_test_nad = Reaction(f'test_nad', f'Test NAD', 'TEST', 0, 0)
+        rxn_test_nad.add_metabolites({
+            self.model.metabolites.get_by_id(self.others['nad']): -1,
+            self.model.metabolites.get_by_id(self.others['nadh']): 1,
+            self.model.metabolites.get_by_id(self.others['h_e']): -1,
+        })
+        rxn_test_nadp = Reaction(f'test_nadp', f'Test NADP', 'TEST', 0, 0)
+        rxn_test_nadp.add_metabolites({
+            self.model.metabolites.get_by_id(self.others['nadp']): -1,
+            self.model.metabolites.get_by_id(self.others['nadph']): 1,
+            self.model.metabolites.get_by_id(self.others['h_e']): -1,
+        })
+        rxn_test_q8 = Reaction(f'test_q8', f'Test Q8', 'TEST', 0, 0)
+        rxn_test_q8.add_metabolites({
+            self.model.metabolites.get_by_id(self.others['q8']): -1,
+            self.model.metabolites.get_by_id(self.others['q8h2']): 1,
+            self.model.metabolites.get_by_id(self.others['h_e']): -2,
+        })
+        rxn_accoa_coa = Reaction('test_accoa_coa', 'test_accoa_coa', 'TEST', 0, 0)
+        rxn_accoa_coa.add_metabolites({
+            self.model.metabolites.get_by_id(self.others['h2o']): -1,
+            self.model.metabolites.get_by_id(self.others['accoa']): -1,
+            self.model.metabolites.get_by_id(self.others['coa']): 1,
+            self.model.metabolites.get_by_id(self.others['ac']): 1,
+            self.model.metabolites.get_by_id(self.others['h_c']): 1,
+        })
+        to_add = [rxn_test_atp, rxn_test_nad, rxn_test_nadp, rxn_test_q8, rxn_accoa_coa]
+        _to_add = []
+        for r in to_add:
+            if r.id not in self.model.reactions:
+                _to_add.append(r)
+        self.model.add_reactions(_to_add)
+        added = {}
+        for r in to_add:
+            if r.id in self.model.reactions:
+                added[r.id] = self.model.reactions.get_by_id(r.id)
+        return added
 
     def build_tests(self):
         for aa, cpd_id in self.amino_acids.items():
