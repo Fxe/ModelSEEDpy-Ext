@@ -70,35 +70,7 @@ def fix_template(t):
         t.compounds.get_by_id(cpd_id).name = name
 
 
-def _hack_template(t):
-    if 'rxn40355_c' in t.reactions:
-        mb = t.reactions.rxn40355_c.check_mass_balance()
-        if len(mb) > 0:
-            t.reactions.rxn40355_c.add_metabolites({
-                t.compcompounds.cpd00067_c: -1
-            })
-    if 'rxn00929_c' in t.reactions:
-        t.reactions.rxn00929_c.upper_bound = 0
-    if 'rxn00931_c' in t.reactions:
-        t.reactions.rxn00931_c.upper_bound = 0
-    if 'rxn09188_c' in t.reactions:
-        t.reactions.rxn09188_c.upper_bound = 0
-    if 'rxn00085_c' in t.reactions:
-        t.reactions.rxn00085_c.upper_bound = 0
-    if 'rxn00146_c' in t.reactions:
-        t.reactions.rxn00146_c.lower_bound = 0
-    if 'rxn45744_c' in t.reactions:
-        t.reactions.rxn45744_c.upper_bound = 0
-    if 'rxn39860_c' in t.reactions:
-        t.reactions.rxn39860_c.lower_bound = 0
-    if 'rxn05595_c' in t.reactions:
-        t.reactions.rxn05595_c.lower_bound = 0
-    if 'rxn05596_c' in t.reactions:
-        t.reactions.rxn05596_c.upper_bound = 0
-    if 'rxn43657_c' in t.reactions:
-        t.reactions.rxn43657_c.upper_bound = 0
-    if 'rxn09388_c' in t.reactions:
-        t.reactions.rxn09388_c.upper_bound = 0
+
 
 
 def add_tests(model):
@@ -140,8 +112,11 @@ def add_tests(model):
 
 
 def add_anme_data_to_template(t):
-    from cobrakbase.core.kbasefba.newmodeltemplate_metabolite import NewModelTemplateCompound, NewModelTemplateCompCompound
+    from modelseedpy.core.mstemplate import TemplateReactionType
+    from cobrakbase.core.kbasefba.newmodeltemplate_metabolite import NewModelTemplateCompound, \
+        NewModelTemplateCompCompound
     from cobrakbase.core.kbasefba.newmodeltemplate_reaction import NewModelTemplateReaction
+    from modelseedpy.core.mstemplate import NewModelTemplateComplex, NewModelTemplateRole
     template_anme_compounds = [
         NewModelTemplateCompound('cpdAQDS', 'C14H6O8S2', 'AQDS', 0),
         NewModelTemplateCompound('cpdAQH2DS', 'C14H8O8S2', 'AQH2DS', 0),
@@ -158,11 +133,22 @@ def add_anme_data_to_template(t):
     t.add_comp_compounds(template_anme_ccompounds)
 
     template_anme_reactions = {
-        'rxnAQDS': NewModelTemplateReaction('rxnAQDS_c', 'rxn00000',
-                                            'AQDS', 'ETC', 0, 1000, gapfill_direction='>'),
-        'rxnMatMephen': NewModelTemplateReaction('rxnMatMephen_c', 'rxn00000',
-                                                 'ANME Matrix', 'ETC', 0, 1000, gapfill_direction='>')
+        'rxnAQDS': NewModelTemplateReaction('rxnAQDS_c', 'rxn00000', 'AQDS', 'ETC', 0, 1000, gapfill_direction='>'),
+        'rxnMatMephen': NewModelTemplateReaction('rxnMatMephen_c', 'rxn00000', 'ANME Matrix', 'ETC', 0, 1000,
+                                                 gapfill_direction='>')
     }
+    if 'rxa09272_c' not in t.reactions:
+        template_reaction = NewModelTemplateReaction('rxa09272_c', 'rxa09272',
+                                                     'TfrAB', 'ETC', 0, 1000, gapfill_direction='>')
+        template_reaction.add_metabolites({
+            t.compcompounds.cpd00036_c: 1,
+            t.compcompounds.cpd00106_c: -1,
+            t.compcompounds.cpd02817_c: -1,
+            t.compcompounds.cpd02246_c: -1,
+            t.compcompounds.cpd02935_c: 1,
+            t.compcompounds.cpd00067_c: 1,
+        })
+        template_anme_reactions['rxa09272_c'] = template_reaction
     template_anme_reactions['rxnAQDS'].add_metabolites({
         t.compcompounds.cpd08702_c: -1,
         t.compcompounds.cpdAQDS_e: -1,
@@ -176,8 +162,113 @@ def add_anme_data_to_template(t):
         t.compcompounds.cpdETCMe_e: 2,
         t.compcompounds.cpdETCM_e: -2,
     })
+
+    if 'rxa40330_c' not in t.reactions:
+        r = NewModelTemplateReaction('rxa40330_c', 'rxa40330', 'Fqo', 'ANME', -1000, 1000,
+                                     base_cost=5, reverse_penalty=5, forward_penalty=5)
+        r.add_metabolites({
+            t.compcompounds.cpd00649_c: -1,
+            t.compcompounds.cpd00792_c: 1,
+            t.compcompounds.cpd08701_c: 1,
+            t.compcompounds.cpd08702_c: -1,
+        })
+        template_anme_reactions[r.id] = r
+    if 'rxa40000_c' not in t.reactions:
+        r = NewModelTemplateReaction('rxa40000_c', 'rxa40000', 'FpoF', 'ANME', 0, 1000,
+                                     base_cost=5, reverse_penalty=5, forward_penalty=5)
+        r.add_metabolites({
+            t.compcompounds.cpd00649_c: -1,
+            t.compcompounds.cpd00792_c: 1,
+            t.compcompounds.cpd11621_c: 2,
+            t.compcompounds.cpd11620_c: -2,
+            t.compcompounds.cpd00067_c: -2,
+        })
+        template_anme_reactions[r.id] = r
+
     # t.add_reactions([template_archaea.reactions.rxn40355_c])
     t.add_reactions(list(template_anme_reactions.values()))
+    t.reactions.rxnAQDS_c.type = TemplateReactionType.UNIVERSAL
+    t.reactions.rxnMatMephen_c.type = TemplateReactionType.UNIVERSAL
+
+    t.reactions.rxn03020_c.add_metabolites({
+        t.compcompounds.cpd00971_c: 4,
+        t.compcompounds.cpd00971_e: -4,
+    })
+
+    t.compounds.cpd11620.default_charge = 5
+    t.compcompounds.cpd11620_c.charge = 5
+
+    for cpd_id, name in COMPOUND_RENAME.items():
+        if cpd_id in t.compounds:
+            cpd = t.compounds.get_by_id(cpd_id)
+            cpd.name = name
+
+    t.reactions.rxn17445_c.lower_bound = -1000
+
+    if 'rxn46184_c' in t.reactions:
+        _m = t.reactions.rxn46184_c.metabolites
+        if 'cpd00735_c' in t.compcompounds:
+            if t.compcompounds.cpd27506_c in _m:
+                t.reactions.rxn46184_c.add_metabolites({
+                    t.compcompounds.cpd27090_c: +1,
+                    t.compcompounds.cpd27506_c: -1,
+                    t.compcompounds.cpd00735_c: -1,
+                    t.compcompounds.cpd00643_c: +1,
+                })
+
+    template_roles = {r.id for r in t.roles}
+    hdrABC_roles = {'ftr01963', 'ftr01962', 'ftr01965', 'tftr00656', 'tftr00596'}
+    if hdrABC_roles & template_roles == hdrABC_roles:
+        print('adding HdrABC complex')
+        cpx_hdrABC = NewModelTemplateComplex('cpx90000', 'HdrABC', 'ANME', 'ANME', 0)
+        cpx_hdrABC.add_role(t.roles.ftr01963, True, False)
+        cpx_hdrABC.add_role(t.roles.ftr01962, True, False)
+        cpx_hdrABC.add_role(t.roles.ftr01965, True, False)
+        cpx_hdrABC.add_role(t.roles.tftr00656, True, False)
+        cpx_hdrABC.add_role(t.roles.tftr00596, True, False)
+        if 'cpx90000' not in t.complexes:
+            t.add_complexes([cpx_hdrABC])
+        if 'rxn43076_c' in t.reactions:
+            t.reactions.rxn43076_c.complexes.add(t.complexes.cpx90000)
+
+    if 'rxa40330_c' in t.reactions:
+        t.reactions.rxa40330_c.complexes.add(t.complexes.cpx00310)
+
+
+    roles_to_add = []
+    for role_id, role_name in TEMPLATE_ANME_ROLES.items():
+        if role_id not in t.roles:
+            role = NewModelTemplateRole(role_id, role_name, 'DRAM')
+            roles_to_add.append(role)
+    if len(roles_to_add) > 0:
+        print(f'add {len(roles_to_add)} missing roles')
+        t.add_roles(roles_to_add)
+
+    complexes_to_add = []
+    for complex_id, (complex_name, complex_roles) in TEMPLATE_ANME_COMPLEXES.items():
+        if complex_id not in t.complexes:
+            cpx = NewModelTemplateComplex(complex_id, complex_name, 'ANME', 'ANME', 0)
+            for role_id, trig, op in complex_roles:
+                cpx.add_role(t.roles.get_by_id(role_id), trig, op)
+            complexes_to_add.append(cpx)
+    if len(complexes_to_add) > 0:
+        print(f'add {len(complexes_to_add)} missing complexes')
+        t.add_complexes(complexes_to_add)
+
+    if 'rxa09272_c' in t.reactions:
+        t.reactions.rxa09272_c.complexes.add(t.complexes.acpx01000)
+    if 'rxa40330_c' in t.reactions:
+        t.reactions.rxa40330_c.complexes.add(t.complexes.acpx01001)
+
+    for r in t.reactions:
+        if not type(r.type) is str:
+            r.type = r.type.value
+
+    for rxn_id, (lb, ub) in REACTION_ANME_BOUNDS.items():
+        template_reaction = t.reactions.get_by_id(rxn_id)
+        template_reaction.lower_bound = lb
+        template_reaction.upper_bound = ub
+
     return t
 
 
@@ -211,16 +302,53 @@ media_co2_sulfate_matrix = MSMedia.from_dict({
 
     'cpdETCMe': (-20, 10),  # matrix
 })
+def _hack_template(t):
+    if 'rxn40355_c' in t.reactions:
+        mb = t.reactions.rxn40355_c.check_mass_balance()
+        if len(mb) > 0:
+            t.reactions.rxn40355_c.add_metabolites({
+                t.compcompounds.cpd00067_c: -1
+            })
+    if 'rxn00929_c' in t.reactions:
+        t.reactions.rxn00929_c.upper_bound = 0
+    if 'rxn00931_c' in t.reactions:
+        t.reactions.rxn00931_c.upper_bound = 0
+    if 'rxn09188_c' in t.reactions:
+        t.reactions.rxn09188_c.upper_bound = 0
+    if 'rxn00085_c' in t.reactions:
+        t.reactions.rxn00085_c.upper_bound = 0
+    if 'rxn00146_c' in t.reactions:
+        t.reactions.rxn00146_c.lower_bound = 0
+    if 'rxn45744_c' in t.reactions:
+        t.reactions.rxn45744_c.upper_bound = 0
+    if 'rxn39860_c' in t.reactions:
+        t.reactions.rxn39860_c.lower_bound = 0
+    if 'rxn05595_c' in t.reactions:
+        t.reactions.rxn05595_c.lower_bound = 0
+    if 'rxn05596_c' in t.reactions:
+        t.reactions.rxn05596_c.upper_bound = 0
+    if 'rxn43657_c' in t.reactions:
+        t.reactions.rxn43657_c.upper_bound = 0
+    if 'rxn09388_c' in t.reactions:
+        t.reactions.rxn09388_c.upper_bound = 0
 
 
 REACTION_ANME_BOUNDS = {
     # 4 H+ [c] + 2 F420 [c] + CoM [c] + HTP [c] + 2 Reducedferredoxin [c] -->
     # 2 F420H2 [c] + CoM-S-S-CoB [c] + 2 Oxidizedferredoxin [c]
     'rxn43076_c': (0, 1000),
+
     # NAD [c] + CoA [c] + Pyruvate [c] <=> NADH [c] + CO2 [c] + Acetyl-CoA [c]
     'rxn00154_c': (-1000, 1000),
+
     # F420H2 [c] + MP [c] --> H+ [c] + F420 [c] + MPH2 [c]
     'rxn24614_c': (0, 1000),
+
+    # Succinyl-CoA [c] + 2 FD (red) [c] --> CoA [c] + 2-Oxoglutarate [c] + 2 FD (ox) [c]
+    'rxn14048_c': (0, 1000),
+
+    # CO2 [c0] + Acetyl-CoA [c0] + H+ [c0] + 2 FD (red) [c0] <=> CoA [c0] + Pyruvate [c0] + 2 FD (ox) [c0]
+    'rxn13974_c': (-1000, 1000),
 }
 
 
@@ -263,6 +391,42 @@ MEDIUM_ETC_METHANE_AQDS = {
     'EX_cpdAQDS_e0': 1000,
 }
 
+TEMPLATE_ANME_ROLES = {
+    'aftr01000': 'fumarate reductase (CoM/CoB) subunit A [EC:1.3.4.1]',
+    'aftr01001': 'fumarate reductase (CoM/CoB) subunit B [EC:1.3.4.1]',
+    'aftr01002': 'F420H2:quinone oxidoreductase subunit A [EC:1.1.98.4]',
+    'aftr01003': 'F420H2:quinone oxidoreductase subunit B/C [EC:1.1.98.4]',
+    'aftr01004': 'F420H2:quinone oxidoreductase subunit D [EC:1.1.98.4]',
+    'aftr01005': 'F420H2:quinone oxidoreductase subunit F [EC:1.1.98.4]',
+    'aftr01006': 'F420H2:quinone oxidoreductase subunit H [EC:1.1.98.4]',
+    'aftr01007': 'F420H2:quinone oxidoreductase subunit I [EC:1.1.98.4]',
+    'aftr01008': 'F420H2:quinone oxidoreductase subunit J [EC:1.1.98.4]',
+    'aftr01009': 'F420H2:quinone oxidoreductase subunit K [EC:1.1.98.4]',
+    'aftr01010': 'F420H2:quinone oxidoreductase subunit L [EC:1.1.98.4]',
+    'aftr01011': 'F420H2:quinone oxidoreductase subunit M [EC:1.1.98.4]',
+    'aftr01012': 'F420H2:quinone oxidoreductase subunit N [EC:1.1.98.4]'
+}
+
+TEMPLATE_ANME_COMPLEXES = {
+        'acpx01000': ('TfrAB', (
+            ('aftr01000', True, False),
+            ('aftr01001', True, False),
+        )),
+        'acpx01001': ('Fqo', (
+            ('aftr01002', True, False),
+            ('aftr01003', True, False),
+            ('aftr01004', True, False),
+            ('aftr01005', True, False),
+            ('aftr01006', True, False),
+            ('aftr01007', True, False),
+            ('aftr01008', True, False),
+            ('aftr01009', True, False),
+            ('aftr01010', True, False),
+            ('aftr01011', True, False),
+            ('aftr01012', True, False),
+        )),
+    }
+
 KO_ROLES = {
     'KO:K18209': 'fumarate reductase (CoM/CoB) subunit A [EC:1.3.4.1]',
     'KO:K18210': 'fumarate reductase (CoM/CoB) subunit B [EC:1.3.4.1]',
@@ -280,10 +444,12 @@ KO_ROLES = {
 }
 
 COMPOUND_RENAME = {
-    'cpd00792': 'F420H2',
-    'cpd00649': 'F420',
-    'cpd08701': 'MP',
-    'cpd08702': 'MPH2',
+    'cpd00792': 'F420H2 (red)',
+    'cpd00649': 'F420 (ox)',
+    'cpd08701': 'MP (ox)',
+    'cpd08702': 'MPH2 (red)',
+    'cpd11621': 'FD (ox)',
+    'cpd11620': 'FD (red)',
 }
 
 REACTION_RENAME = {
