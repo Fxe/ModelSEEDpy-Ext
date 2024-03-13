@@ -1,15 +1,18 @@
+import logging
 import efmtool
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 def get_solutions(efms, reactions):
     t = efms.transpose()
     res = []
-    for efm in t:
+    for fm in t:
         flux_v = {}
         for i in range(len(reactions)):
             rxn_id = reactions[i]
-            v = efm[i]
+            v = fm[i]
             if v != 0:
                 flux_v[rxn_id] = v
         res.append(flux_v)
@@ -18,24 +21,44 @@ def get_solutions(efms, reactions):
 
 def efm(model):
     metabolites = list(map(lambda x: x.id, model.metabolites))
-    reactions = list(map(lambda x: x.id, model.reactions))
+    reactions = []
+    for r in model.reactions:
+        lb = r.lower_bound
+        ub = r.upper_bound
+        if lb == ub and lb == 0:
+            logger.warning(f'ignore zero bound reaction {r} [{lb}, {ub}]')
+        else:
+            reactions.append(r.id)
 
     s_array = []
     rev = []
+    flipped = set()
     for r in reactions:
-        r_array = []
         rxn = model.reactions.get_by_id(r)
+        lb = rxn.lower_bound
+        ub = rxn.upper_bound
+
         rxn_metabolites = dict(map(lambda x: (x[0].id, x[1]), rxn.metabolites.items()))
+
+        if lb < 0 and ub == 0:  # flip if reverse reaction
+            flipped.add(rxn.id)
+            rxn_metabolites = {k: v * -1 for k, v in rxn_metabolites.items()}
+
+        r_array = [rxn_metabolites.get(m) for m in metabolites]
+
+        """
+        # old stuff
         for m in metabolites:
             v = 0
             if m in rxn_metabolites:
                 v = rxn_metabolites[m]
             r_array.append(v)
+        """
         s_array.append(r_array)
-        rev.append(1 if rxn.lower_bound < 0 and rxn.upper_bound > 0 else 0)
+        rev.append(1 if lb < 0 < ub else 0)  # 1 if reversible else 0
     S = np.array(s_array)
     S = S.transpose()
 
-    efms = efmtool.calculate_efms(S, rev, reactions, metabolites)
+    res = efmtool.calculate_efms(S, rev, reactions, metabolites)
 
-    return get_solutions(efms, reactions)
+    return get_solutions(res, reactions)

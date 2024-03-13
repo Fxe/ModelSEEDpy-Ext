@@ -28,6 +28,7 @@ setup(name='modelseedpy_ext',
           "pandas >= 1.0.0",
           "networkx >= 2.4",
           "cobra >= 0.17.1",
+          "numpy",
           "lxml"
       ],
       zip_safe=True)

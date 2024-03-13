@@ -3,6 +3,30 @@ import pandas as pd
 import os
 
 
+class FastANIOutput:
+
+    def __init__(self):
+        self.d_ani = {}
+
+    @staticmethod
+    def from_tsv(path):
+        d_ani = {}
+        with open(path, 'r') as fh:
+            line = fh.readline()
+            while line:
+                if line:
+                    a, b, score, f1, f2 = line.split('\t')
+                    a = a.split('/')[-1]
+                    b = b.split('/')[-1]
+                    if a not in d_ani:
+                        d_ani[a] = {}
+                    d_ani[a][b] = (score, f1, f2)
+                line = fh.readline()
+        res = FastANIOutput()
+        res.d_ani = d_ani
+        return res
+
+
 class ProgramANI:
 
     def __init__(self, path_to_bin="fastANI"):
