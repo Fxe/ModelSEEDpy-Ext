@@ -44,7 +44,7 @@ def efm(model):
             flipped.add(rxn.id)
             rxn_metabolites = {k: v * -1 for k, v in rxn_metabolites.items()}
 
-        r_array = [rxn_metabolites.get(m) for m in metabolites]
+        r_array = [rxn_metabolites.get(m, 0) for m in metabolites]
 
         """
         # old stuff
