@@ -7,6 +7,7 @@ class MAGE:
         self.ani_score_self = None
         self.handle_to_genome = None
         self.ani_graph = None
+        self.fn_process_ani_name = None
 
     def load_ani_data(self, path_gca, path_gcf, path_self):
         self.ani_score_gca = self.read_ani_out(path_gca)
@@ -35,13 +36,12 @@ class MAGE:
     def get_handle_name(handle_ref):
         return handle_to_genome[handle_ref.split('/')[-1]]
 
-    @staticmethod
-    def load_data2(ani_scores, nodes, edges):
+    def load_data2(self, ani_scores, nodes, edges):
         for e1 in ani_scores:
-            node1 = self.get_handle_name(e1)
+            node1 = self.fn_process_ani_name(e1)
             nodes.add(node1)
             for e2 in ani_scores[e1]:
-                node2 = self.get_gtdb_genome(e2)
+                node2 = self.fn_process_ani_name(e2)
                 nodes.add(node2)
                 if e1 != e2:
                     score, p1, p2 = ani_scores[e1][e2]
@@ -59,36 +59,13 @@ class MAGE:
     def build_graph(self):
         nodes = set()
         edges = {}
-        load_data2(self.ani_score_gca, nodes, edges)
+        self.load_data2(self.ani_score_gca, nodes, edges)
         print(len(nodes), len(edges))
-        load_data2(self.ani_score_gcf, nodes, edges)
+        self.load_data2(self.ani_score_gcf, nodes, edges)
         print(len(nodes), len(edges))
-
-        nodes_self = set()
-        for e1 in self.ani_score_self:
-            node1 = get_handle_name(e1)
-            nodes_self.add(node1)
-            nodes.add(node1)
-            for e2 in self.ani_score_self[e1]:
-                node2 = get_handle_name(e2)
-                nodes_self.add(node2)
-                nodes.add(node2)
-                if e1 != e2:
-                    score, p1, p2 = ani_score_self[e1][e2]
-                    p_1_2 = (node1, node2)
-                    p_2_1 = (node2, node1)
-                    if not p_1_2 in edges and not p_2_1 in edges:
-                        edges[p_1_2] = [score]
-                    elif p_1_2 in edges:
-                        edges[p_1_2].append(score)
-                    elif p_2_1 in edges:
-                        edges[p_2_1].append(score)
-                    else:
-                        print('this should never print')
-
+        self.load_data2(self.ani_score_self, nodes, edges)
         print(len(nodes), len(edges))
 
-        import networkx as nx
         _edges = []
         for p in edges:
             e1, e2 = p
@@ -99,6 +76,7 @@ class MAGE:
             score = total / len(scores)
             _edges.append([e1, e2, score])
 
+        import networkx as nx
         self.ani_graph = nx.Graph()
         self.ani_graph.add_nodes_from(nodes)
         self.ani_graph.add_weighted_edges_from(_edges)
@@ -197,4 +175,76 @@ class MAGE:
 
         return genome_to_file
 
+    @staticmethod
+    def get_genomeOO(filename):
+        from modelseedpy import MSGenome
+        if 'handle' in filename:
+            genome = MSGenome.from_fasta(filename)
+            return genome
+        else:
+            genome = MSGenome.from_fasta(filename)
+            return genome
 
+    @staticmethod
+    def catalog_genome(c, annotation_database):
+        genome = genomes[c]
+        for f in genome.features:
+            annotation_rast = f.ontology_terms.get('RAST', [])
+            for annotation_str in annotation_rast:
+                if annotation_str not in annotation_database:
+                    annotation_database[annotation_str] = {}
+                if c not in annotation_database[annotation_str]:
+                    annotation_database[annotation_str][c] = {}
+                annotation_database[annotation_str][c][f'self:{f.id}'] = float(100)
+            # print(rast)
+        for k, v in G[c].items():
+            score = v['weight']
+            genome_path = everything.get(k)
+            if genome_path:
+                genome = MAGE.get_genomeOO(genome_path)
+                _feature_to_annotation = {}
+                if genome:
+                    if 'handle' in genome_path:
+                        for f in genome.features:
+                            f_id = f.id
+                            _feature_to_annotation[f_id] = gene_id_to_rast.get(f_id, [])
+                    else:
+                        for f in genome.features:
+                            s = f.id.split()
+                            f_id = s[0]
+                            _feature_to_annotation[f_id] = gene_id_to_rast.get(f_id, [])
+                for f_id in _feature_to_annotation:
+                    for annotation_str in _feature_to_annotation[f_id]:
+                        if annotation_str not in annotation_database:
+                            annotation_database[annotation_str] = {}
+                        if c not in annotation_database[annotation_str]:
+                            annotation_database[annotation_str][c] = {}
+                        annotation_database[annotation_str][c][f'{k}:{f_id}'] = float(score)
+        return None
+
+    def get_annotation_database(self, centroids):
+        annotation_database = {}
+        for c in centroids:
+            self.catalog_genome(c, annotation_database)
+        return annotation_database
+
+    def cliff(self, annotation_database):
+        annotation_database_geq_85 = {}
+        annotation_database_lo_85 = {}
+        for annotation_str in annotation_database:
+            annotation_set_geq_85 = {}
+            annotation_set_lo_85 = {}
+            for g_id in annotation_database[annotation_str]:
+                for g_other, score in annotation_database[annotation_str][g_id].items():
+                    if score >= 85:
+                        if g_id not in annotation_set_geq_85:
+                            annotation_set_geq_85[g_id] = {}
+                        annotation_set_geq_85[g_id][g_other] = score
+                    else:
+                        if g_id not in annotation_set_lo_85:
+                            annotation_set_lo_85[g_id] = {}
+                        annotation_set_lo_85[g_id][g_other] = score
+            if len(annotation_set_geq_85) > 0:
+                annotation_database_geq_85[annotation_str] = annotation_set_geq_85
+            if len(annotation_set_lo_85) > 0:
+                annotation_database_lo_85[annotation_str] = annotation_set_lo_85
