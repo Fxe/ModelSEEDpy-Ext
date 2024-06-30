@@ -1,3 +1,227 @@
+from modelseedpy import MSBuilder, MSATPCorrection, MSMedia, MSGapfill
+
+
+MEDIA_GENOME_SCALE = medium_gapfill = {
+    'EX_cpd00029_e0': 20.0,
+ 'EX_cpd00013_e0': 100.0,
+ 'EX_cpd00001_e0': 100.0,
+ 'EX_cpd00218_e0': 0.0, #niacin
+ 'EX_cpd00220_e0': 100.0,
+ 'EX_cpd00305_e0': 100.0,
+ 'EX_cpd00393_e0': 100.0,
+ 'EX_cpd03424_e0': 100.0,
+ 'EX_cpd00443_e0': 0.0, #ABEE
+ 'EX_cpd00644_e0': 0.0002281,
+ 'EX_cpd00263_e0': 100.0,
+ 'EX_cpd00048_e0': 100.0,
+ 'EX_cpd00009_e0': 100.0,
+ 'EX_cpd00242_e0': 29.759425,
+ 'EX_cpd00205_e0': 1.3415688,
+ 'EX_cpd00063_e0': 100.0,
+ 'EX_cpd00971_e0': 34.9324073,
+ 'EX_cpd00099_e0': 100.0,
+ 'EX_cpd00254_e0': 100.0,
+ 'EX_cpd00030_e0': 100.0,
+ 'EX_cpd00058_e0': 100.0,
+ 'EX_cpd00034_e0': 100.0,
+ 'EX_cpd10515_e0': 100.0,
+ 'EX_cpd00149_e0': 100.0,
+ 'EX_cpd00244_e0': 100.0,
+ 'EX_cpd11574_e0': 100.0,
+ 'EX_cpd15574_e0': 100.0,
+ 'EX_cpd00067_e0': 100.0,
+ 'EX_cpd00209_e0': 10.0}
+
+
+def load_genome_from_annotation_file(filename):
+    from pandas import read_csv
+    from modelseedpy.core.msgenome import MSGenome, MSFeature
+
+    df = read_csv(filename, sep='\t', index_col=0)
+    features = {}
+    for feature_id, d in df.iterrows():
+        gene_id = d['gene_id']
+        feature = MSFeature(gene_id, '')
+        for rast_feature in d['RAST'].split('; '):
+            feature.add_ontology_term('RAST', rast_feature)
+        if feature.id not in features:
+            features[feature.id] = feature
+        else:
+            raise ValueError('duplicate gene ID')
+    genome = MSGenome()
+    genome.add_features(list(features.values()))
+
+    return genome
+
+
+class SynComStudy:
+
+    def __init__(self, template):
+        self.rast = None
+        self.kbase = None
+        self.genome_acido = None
+        self.genome_rhoda = None
+        self.template = template
+
+    def build_isolates(self):
+        model_acido = self.build_isolate('3H11', self.genome_acido)
+        model_rhoda = self.build_isolate('R12', self.genome_rhoda)
+
+        return model_acido, model_rhoda
+
+    def build_isolate(self, model_id, genome):
+        model = self.build_model(model_id, genome)
+        model_gapfill = model.copy()
+
+        atp_tests = self.atp_correction(model)
+        gap_fill = self.gap_fill(model, atp_tests)
+
+        rxn_new, ex_new = self._integrate_solution(model_gapfill, gap_fill)
+        print(f'new reactions {len(rxn_new)} new exchanges {len(ex_new)}')
+        model_gapfill.medium = {k: v for k, v in MEDIA_GENOME_SCALE.items() if k in model_gapfill.reactions}
+
+        return model_gapfill
+
+    @staticmethod
+    def _add_atpm(model):
+        from cobra.core import Reaction
+        if 'ATPM_c0' not in model.reactions:
+            atpm = Reaction(f'ATPM_c0', f'ATPM', 'ATPM', 0, 1000)
+            atpm.add_metabolites({
+                model.metabolites.cpd00001_c0: -1,
+                model.metabolites.cpd00002_c0: -1,
+                model.metabolites.cpd00008_c0: 1,
+                model.metabolites.cpd00009_c0: 1,
+                model.metabolites.cpd00067_c0: 1,
+            })
+            model.add_reactions([atpm])
+
+    def build_model(self, model_id, genome):
+        """
+        build base model
+        :param model_id:
+        :param genome:
+        :return:
+        """
+        b = MSBuilder(genome, self.template, model_id)
+        model_base = b.build(model_id, annotate_with_rast=False)
+        SynComStudy._add_atpm(model_base)
+        return model_base
+
+    def atp_correction(self, model):
+        media = MSMedia.from_dict({
+            'cpd00001': 1000,
+            'cpd00067': 1000,
+            'cpd00209': 1,
+            'cpd00029': 1,
+        })
+        media.id = 'nitrate'
+        media.name = 'nitrate'
+        media.get_media_constraints()
+        atp_correction = MSATPCorrection(model, self.template, [media],
+                                         'c0', atp_hydrolysis_id='ATPM_c0',
+                                         load_default_medias=False)
+        tests = atp_correction.run_atp_correction()
+
+        return tests
+
+    def _get_solution(self, gf, sol, model):
+        res = {}
+        for rxn in gf.gfmodel.reactions:
+            v = round(sol.fluxes[rxn.id], 9)
+            if v != 0:
+                if rxn.id not in model.reactions:
+                    if rxn.id[:-1] in self.template.reactions:
+                        # print(v, rxn.id, rxn.build_reaction_string(True))
+                        lb = -1000
+                        ub = 1000
+                        if v > 0:
+                            lb = 0
+                        elif v < 0:
+                            ub = 0
+                        res[rxn.id[:-1]] = (lb, ub)
+        return res
+
+    def _integrate_solution(self, model, gap_fill_solution):
+        added_reactions = []
+        for rxn_id, (lb, ub) in gap_fill_solution.items():
+            template_reaction = self.template.reactions.get_by_id(rxn_id)
+            model_reaction = template_reaction.to_reaction(model)
+            model_reaction.lower_bound = lb
+            model_reaction.upper_bound = ub
+            added_reactions.append(model_reaction)
+        model.add_reactions(added_reactions)
+        add_exchanges = MSBuilder.add_exchanges_to_model(model)
+
+        return added_reactions, add_exchanges
+
+    def gap_fill(self, model, tests, min_biomass=0.02):
+        model.objective = 'bio1'
+        gapfill = MSGapfill(model,
+                            default_gapfill_templates=[self.template],
+                            test_conditions=tests,
+                            default_target='bio1')
+
+        gapfill.gfmodel.reactions.bio1.lower_bound = min_biomass
+        gapfill.gfmodel.medium = MEDIA_GENOME_SCALE
+
+        gapfill_fba = gapfill.gfmodel.optimize()
+
+        gapfill_solution = self._get_solution(gapfill, gapfill_fba, model)
+
+        return gapfill_solution
+
+
+def build_genome_annotation_file(genome, gene_id_remap, starts_with_filter='FW510-R12',
+                                 filename_psort='psortb_r12_results.tsv',
+                                 filename_out='annotation_rhoda.tsv'):
+    """
+    :param genome: rhoda or acido genome
+    :param gene_id_remap: dict mapping feature_id to id from expression data
+    :param starts_with_filter: FW510-R12 for rhoda GW101-3H11 for acido
+    :param filename_psort: psort output file
+    :param filename_out: output annotation_file
+    :return:
+    """
+    psort_data = {}
+    with open(filename_psort, 'r') as fh:
+        h = fh.readline()
+        l = fh.readline()
+        header = {v: i for i, v in enumerate(h.split('\t'))}
+        while l:
+            _p = [x.strip() for x in l.split('\t')]
+            psort_data[_p[header['SeqID']]] = [
+                _p[header['Final_Localization']],
+                _p[header['Final_Score']],
+                _p[header['Final_Localization_Details']],
+                _p[header['Secondary_Localization']],
+            ]
+            l = fh.readline()
+    remap = {}
+    for k, v in gene_id_remap.items():
+        if k.startswith(starts_with_filter):
+            if v not in remap:
+                remap[v] = k
+            else:
+                print(k)
+    with open(filename_out, 'w') as fh:
+        d = [
+            'feature_id', 'gene_id', 'RAST',
+            'psort_loc', 'psort_loc_score', 'psort_loc_details', 'psort_loc_sec']
+        fh.write('\t'.join(d) + '\n')
+        for f in genome.features:
+            d = [
+                f.id,
+                remap[f.id],
+                '; '.join(f.ontology_terms.get('RAST', [])),
+                psort_data[f.id][0],
+                psort_data[f.id][1],
+                psort_data[f.id][2],
+                psort_data[f.id][3]
+            ]
+            fh.write('\t'.join(d) + '\n')
+
+
 class GSPComBuilder:
     """
     Assembles Community model for denitrification

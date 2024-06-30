@@ -2,6 +2,11 @@ import hashlib
 import pandas as pd
 
 
+def progress(ite):
+    for y in ite:
+        yield y
+
+
 def sha_hex(s: str):
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 

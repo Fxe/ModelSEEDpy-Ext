@@ -1,6 +1,7 @@
 import logging
 import copy
 import hashlib
+from modelseedpy_ext.re.etl.transform_graph import TransformGraph
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +104,7 @@ class ETLLoadArangoDb:
                     raise e
         return inserted_nodes
 
-    def load_collection_edges(self, G, collection_id, node_ids):
+    def load_collection_edges(self, G: TransformGraph, collection_id, node_ids):
         if not self.db.hasCollection(collection_id):
             logger.warning(f"create {collection_id}")
             self.db.createCollection(name=collection_id, className="Edges")
@@ -131,9 +132,9 @@ class ETLLoadArangoDb:
             bin_vars = {"docs": to_load, "@col": collection_id}
             self.db.AQLQuery(self.aql_upsert, bindVars=bin_vars)
 
-    def load(self, G):
+    def load(self, graph: TransformGraph):
         inserted_nodes = {}
-        for col in G.t_nodes:
-            inserted_nodes[col] = self.load_collection_nodes(G, col)
-        for col in G.t_edges:
-            self.load_collection_edges(G, col, inserted_nodes)
+        for col in graph.t_nodes:
+            inserted_nodes[col] = self.load_collection_nodes(graph, col)
+        for col in graph.t_edges:
+            self.load_collection_edges(graph, col, inserted_nodes)

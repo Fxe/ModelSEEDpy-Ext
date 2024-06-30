@@ -1,5 +1,6 @@
 import hashlib
 import modelseedpy
+from modelseedpy_ext.re.core.biochem_modelseed import ReBiochemModelSEEDCompound
 
 
 class RE:
@@ -105,6 +106,12 @@ class RE:
         file_path = "/home/fliu/KE/data/"
         res = kbase.download_file_from_kbase(token, file_id, file_path)
         return res
+
+    def get_modelseed_compound(self, cpd_id, shallow=True):
+        if self.db.hasCollection('re_biochem_modelseed_compound'):
+            col = self.db['re_biochem_modelseed_compound']
+            if cpd_id in col:
+                return ReBiochemModelSEEDCompound(col['cpd00001'], self, shallow=shallow)
 
     def load_genome(self, genome):
         for f in genome.features:

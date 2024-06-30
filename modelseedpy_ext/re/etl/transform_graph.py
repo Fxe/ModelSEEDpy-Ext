@@ -1,10 +1,15 @@
 from networkx import DiGraph, compose
+from modelseedpy_ext.utils import sha_hex
 
 
 class Node:
-    def __init__(self, key, label, data=None):
-        self._key = key
-        self.label = label
+    def __init__(self, key: str, label: str, data=None):
+        if not key:
+            raise ValueError('empty key')
+        if not label:
+            raise ValueError('empty label')
+        self._key = key.strip()
+        self.label = label.strip()
         self.data = data if data else {}
 
     @property
@@ -20,6 +25,26 @@ class Node:
 
     def __eq__(self, other):
         return isinstance(other, Node) and self.id == other.id
+
+    def to_json(self):
+        out = {
+            '_key': self._key
+        }
+        out.update(self.data)
+
+        return out
+
+
+class NodeHash(Node):
+
+    def __init__(self, key, label, data=None):
+        self._value = key
+        super().__init__(sha_hex(key), label, data)
+
+    def to_json(self):
+        out = super().to_json()
+        out['_value'] = self._value
+        return out
 
 
 class TransformGraph(DiGraph):
@@ -58,14 +83,26 @@ class TransformGraph(DiGraph):
             self.t_edges[label][(l1[0], l2[0])] = data
             self.add_edge(l1[0], l2[0], data=data if data else {})
 
+    def add_transform_edge2(self, src, dst, label, data=None):
+        if src in self.nodes and dst in self.nodes:
+            if label not in self.t_edges:
+                self.t_edges[label] = {}
+            self.t_edges[label][(src, dst)] = data
+            self.add_edge(src, dst, data=data if data else {})
+
     def add_transform_node(self, node_id, label, data=None):
-        if label not in self.t_nodes:
-            self.t_nodes[label] = {}
         node = Node(node_id, label, data)
-        if node.id not in self.t_nodes[label]:
-            self.t_nodes[label][node.id] = node
+
+        return self.add_transform_node2(node)
+
+    def add_transform_node2(self, node: Node):
+        if node.label not in self.t_nodes:
+            self.t_nodes[node.label] = {}
+        if node.id not in self.t_nodes[node.label]:
+            self.t_nodes[node.label][node.id] = node
             self.add_node(node)
         else:
-            pass
+            return self.t_nodes[node.label][node.id]
             #raise Exception('dup')
+
         return node

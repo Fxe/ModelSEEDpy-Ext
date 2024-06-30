@@ -86,8 +86,8 @@ def parse_document_summary(tree):
         if el.tag in parse_function:
             try:
                 doc[el.tag] = parse_function[el.tag](el.text)
-            except:
-                print("error!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", el.tag, el.text)
+            except Exception as ex:
+                print("error!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", el.tag, el.text, ex)
         elif el.tag == "PropertyList":
             property_list = []
             for e in el:
@@ -127,6 +127,7 @@ def parse_doc_sum(t):
 
 
 class NcbiEutils:
+
     def __init__(self, api_key=None):
         self.base_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
         self.api_key = api_key

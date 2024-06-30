@@ -28,7 +28,9 @@ setup(name='modelseedpy_ext',
           "pandas >= 1.0.0",
           "networkx >= 2.4",
           "cobra >= 0.17.1",
+          "pymongo",
           "numpy",
-          "lxml"
+          "lxml",
+          "pyArango"
       ],
       zip_safe=True)

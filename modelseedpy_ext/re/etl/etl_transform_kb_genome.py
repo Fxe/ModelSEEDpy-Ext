@@ -228,7 +228,8 @@ class ETLTransformKBaseGenomeOld(ETLTransformGraph):
             seq_protein_hashes.append(h_protein)
 
             node_seq_dna = add_node(h_dna, "re_seq_dna", data=None)
-            node_seq_protein = add_node(h_protein, "re_seq_protein", data=None)
+            node_seq_protein = add_node(h_protein, ""
+                                                   "", data=None)
 
             if node_ws_genome_object:
                 add_edge(node_ws_genome_object, node_seq_dna, "ws_genome_has_seq_dna")

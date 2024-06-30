@@ -4,6 +4,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def count_symbols(s):
+    symbols = {}
+    for o in s.upper():
+        if o not in symbols:
+            symbols[o] = 0
+        symbols[o] += 1
+
+    return symbols
+
+
 def generate_ec_hierarchy(ec_lv1, ec_lv2, ec_lv3, ec_lv4):
     res = {}
     for ec in ec_lv1:
