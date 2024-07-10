@@ -1,5 +1,10 @@
+import logging
+import os
 import requests
 import xml.etree.ElementTree as ET
+
+
+logger = logging.getLogger(__name__)
 
 
 def parse_link_set_db(tree):
@@ -80,6 +85,35 @@ def parse_document_summary(tree):
         "SubmissionDate": str,
         "LastUpdateDate": str,
         "Primary": str,
+
+        # bioproject
+        "TaxId": int,
+        "Project_Id": int,
+        "Project_Acc": str,
+        "Project_Type": str,
+        "Project_Data_Type": str,
+        "Sort_By_ProjectType": str,
+        "Sort_By_DataType": str,
+        "Sort_By_Organism": str,
+        "Project_Target_Scope": str,
+        "Project_Target_Material": str,
+        "Project_Target_Capture": str,
+        "Project_MethodType": str,
+        "Registration_Date": str,
+        "Project_Name": str,
+        "Project_Title": str,
+        "Organism_Name": str,
+        "Organism_Strain": str,
+        "Sequencing_Status": str,
+        "Submitter_Organization": str,
+        "Supergroup": str,
+        "Relevance_Agricultural": str,
+        "Relevance_Medical": str,
+        "Relevance_Industrial": str,
+        "Relevance_Environmental": str,
+        "Relevance_Evolution": str,
+        "Relevance_Model": str,
+        "Relevance_Other": str,
     }
     doc = {}
     for el in tree:
@@ -87,7 +121,7 @@ def parse_document_summary(tree):
             try:
                 doc[el.tag] = parse_function[el.tag](el.text)
             except Exception as ex:
-                print("error!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", el.tag, el.text, ex)
+                logger.warning(f'error: {el.tag} {el.text} {ex}')
         elif el.tag == "PropertyList":
             property_list = []
             for e in el:
@@ -99,10 +133,9 @@ def parse_document_summary(tree):
                 synonym[e.tag] = e.text
             doc["Synonym"] = synonym
         elif el.tag == "Meta":
-            pass
+            logger.debug(f'Meta: {el} {el.tag} {el.text} {el.attrib}')
         else:
-            # print(el, el.tag, el.text, el.attrib, el)
-            pass
+            logger.debug(f'{el} {el.tag} {el.text} {el.attrib}')
     return doc
 
 
@@ -131,6 +164,7 @@ class NcbiEutils:
     def __init__(self, api_key=None):
         self.base_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
         self.api_key = api_key
+        self.cache_dir = None
         pass
 
     @staticmethod
@@ -181,15 +215,31 @@ class NcbiEutils:
             "query_translation": query_translation,
         }
 
-    def esummary(self, db, id, retmode="xml"):
-        params = {"retmode": retmode, "db": db, "id": id}
+    def _get_eutils_summary_content(self, db, record_id, ret_mode="xml"):
+        if self.cache_dir:
+            cache_file = f'{self.cache_dir}/{db}/{record_id}.xml'
+            if os.path.exists(cache_file):
+                with open(cache_file, 'rb') as fh:
+                    return fh.read()
+
+        params = {"retmode": ret_mode, "db": db, "id": record_id}
         if self.api_key:
             params["api_key"] = self.api_key
 
         res = requests.get(
             self.base_url + "/esummary.fcgi?" + self.build_url_params(params)
         )
-        tree = ET.fromstring(res.content)
+
+        if self.cache_dir:
+            cache_file = f'{self.cache_dir}/{db}/{record_id}.xml'
+            with open(cache_file, 'w', encoding='utf-8') as fh:
+                fh.write(res.content.decode('utf-8'))
+
+        return res.content
+
+    def esummary(self, db, record_id, ret_mode="xml"):
+        content = self._get_eutils_summary_content(db, record_id, ret_mode)
+        tree = ET.fromstring(content)
 
         docs = []
         for el in tree:

@@ -106,3 +106,9 @@ class TransformGraph(DiGraph):
             #raise Exception('dup')
 
         return node
+
+    def summary(self):
+        for k in self.t_nodes:
+            print('N', k, len(self.t_nodes[k]))
+        for k in self.t_edges:
+            print('E', k, len(self.t_edges[k]))

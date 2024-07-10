@@ -67,6 +67,36 @@ class RE:
                 print("create edge collection", c)
                 self.db.createCollection(name=c, className="Edges")
 
+    def get_all_ids(self, collection_id):
+        return self.get_all(collection_id, '_key')
+
+    def get_all(self, collection_id, field):
+        aql = f"""
+        FOR d IN {collection_id}
+            RETURN d.{field}
+        """
+        return set(self.db.AQLQuery(aql, batchSize=50000, rawResults=True))
+
+    def load_graph(self, graph, proxies=None):
+        if proxies is None:
+            proxies = set()
+        from modelseedpy_ext.re.re_seq_loader import ArangoLoaderNodes, ArangoLoaderEdges
+        for collection_id in graph.t_nodes:
+            if collection_id not in proxies:
+                with ArangoLoaderNodes(self.db, collection_id, block_size=50000) as loader:
+                    loader.load(graph)
+                    print(loader.load_stats)
+        for collection_id in proxies:
+            with ArangoLoaderNodes(self.db, collection_id, block_size=50000) as loader:
+                if self.db.hasCollection(collection_id):
+                    loader.loaded_data.update(self.get_all_ids(collection_id))
+                loader.load(graph)
+                print(loader.load_stats)
+        for collection_id in graph.t_edges:
+            with ArangoLoaderEdges(self.db, collection_id, block_size=50000) as loader:
+                loader.load(graph)
+                print(loader.load_stats)
+
     def create_node(self, key, data, col):
         if type(col) == str:
             col = self.db[col]
