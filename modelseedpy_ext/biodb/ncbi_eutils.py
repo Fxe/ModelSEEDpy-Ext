@@ -44,6 +44,90 @@ def parse_document_summary_set(tree):
     return documents
 
 
+def _to_item(e):
+    doc_item = dict(e.items())
+    doc_item['_tag'] = e.tag
+    if e.text:
+        doc_item['_text'] = e.text
+    return doc_item
+
+
+def parse_biosample(t):
+    """
+    tree = ET.fromstring(xml_str)
+    docs = []
+    for el in tree:
+        if el.tag == "BioSample":
+            docs.append(parse_biosample(el))
+        else:
+            print(el.tag, el)
+    :param t:
+    :return:
+    """
+    doc_sum = {}
+    for el in t:
+        if el.tag == "Ids":
+            doc_sum["Ids"] = []
+            for e in el:
+                doc_sum["Ids"].append(_to_item(e))
+        elif el.tag == "Description":
+            doc_sum["Description"] = []
+            for e in el:
+                if e.tag == 'Organism':
+                    org = _to_item(e)
+                    for _e in e:
+                        org[f'_{_e.tag}'] = _to_item(_e)
+                    doc_sum["Description"].append(org)
+                else:
+                    doc_sum["Description"].append(_to_item(e))
+        elif el.tag == "Owner":
+            doc_sum["Owner"] = []
+            for e in el:
+                if e.tag == 'Contacts':
+                    ct = _to_item(e)
+                    for _e in e:
+                        ct[f'_{_e.tag}'] = _to_item(_e)
+                        for __e in _e:
+                            ct[f'_{_e.tag}'][f'_{__e.tag}'] = _to_item(__e)
+                            for ___e in __e:
+                                ct[f'_{_e.tag}'][f'_{__e.tag}'][f'_{___e.tag}'] = _to_item(___e)
+                    doc_sum["Owner"].append(ct)
+                else:
+                    doc_sum["Owner"].append(_to_item(e))
+        elif el.tag == "Models":
+            doc_sum["Models"] = []
+            for e in el:
+                doc_sum["Models"].append(_to_item(e))
+        elif el.tag == "Attributes":
+            doc_sum["Attributes"] = []
+            for e in el:
+                doc_sum["Attributes"].append(_to_item(e))
+        elif el.tag == "Status":
+            doc_sum["Status"] = _to_item(el)
+        elif el.tag == "Package":
+            doc_sum["Package"] = _to_item(el)
+            #for e in el:
+            #    doc_sum["Package"].append(_to_item(e))
+        elif el.tag == "Links":
+            doc_sum["Links"] = []
+            for _el in el:
+                doc_sum["Links"].append(_to_item(_el))
+            #    doc_sum["Package"].append(_to_item(e))
+        elif el.tag == "Item":
+            if "Name" in el.attrib and "Type" in el.attrib:
+                if el.attrib["Type"] == "String":
+                    doc_sum[el.attrib["Name"]] = str(el.text)
+                elif el.attrib["Type"] == "Integer":
+                    doc_sum[el.attrib["Name"]] = int(el.text)
+                else:
+                    print("attrb?", el, el.attrib, el.text)
+            else:
+                print("element?", el, el.attrib, el.text)
+        else:
+            print("tag?", el, el.attrib, el.text)
+    return doc_sum
+
+
 def parse_document_summary(tree):
     parse_function = {
         "RsUid": int,
@@ -234,6 +318,17 @@ class NcbiEutils:
             cache_file = f'{self.cache_dir}/{db}/{record_id}.xml'
             with open(cache_file, 'w', encoding='utf-8') as fh:
                 fh.write(res.content.decode('utf-8'))
+
+        return res.content
+
+    def _e_fetch(self, db, record_id, ret_mode="xml"):
+        params = {"retmode": ret_mode, "db": db, "id": record_id}
+
+        if self.api_key:
+            params["api_key"] = self.api_key
+        res = requests.get(
+            self.base_url + "/efetch.fcgi?" + self.build_url_params(params)
+        )
 
         return res.content
 

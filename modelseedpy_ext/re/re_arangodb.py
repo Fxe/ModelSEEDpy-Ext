@@ -1,15 +1,26 @@
+import logging
 import hashlib
 import modelseedpy
 from modelseedpy_ext.re.core.biochem_modelseed import ReBiochemModelSEEDCompound
+from modelseedpy_ext.utils import progress
+
+logger = logging.getLogger(__name__)
 
 
 class RE:
-    def __init__(self, db, kbase_api, eutils_api, dna_store, protein_store):
+
+    def __init__(self, db, kbase_api, eutils_api, contigs_store, dna_store, protein_store,
+                 contig_val=None, dna_val=None, protein_val=None):
         self.db = db
         self.kbase_api = kbase_api
         self.eutils_api = eutils_api
         self.dna_store = dna_store
+        self.contigs_store = contigs_store
         self.protein_store = protein_store
+
+        self.fn_validate_contigs = contig_val
+        self.fn_validate_dna = dna_val
+        self.fn_validate_protein = protein_val
 
     def init_collections(self):
         collections = [
@@ -76,6 +87,99 @@ class RE:
             RETURN d.{field}
         """
         return set(self.db.AQLQuery(aql, batchSize=50000, rawResults=True))
+
+    @staticmethod
+    def _collect_one_to_one(cursor, d: dict):
+        for a, b in cursor:
+            if a not in b:
+                d[a] = b
+            else:
+                logger.warning(f'multiple [{a}] -> {d[a]} {b}')
+
+    @staticmethod
+    def _collect_one_to_many(cursor, d: dict):
+        for a, b in cursor:
+            if a not in b:
+                d[a] = set()
+            d[a].add(b)
+
+    def generate_ec_hierarchy(self):
+        from modelseedpy_ext.re.utils import generate_ec_hierarchy
+
+        col_ec_number = self.db['re_reaction_ec']
+        ec_numbers = {doc['_key'] for doc in col_ec_number.fetchAll(rawResults=True)}
+        ec_lv1 = set()
+        ec_lv2 = set()
+        ec_lv3 = set()
+        ec_lv4 = set()
+        for ec in ec_numbers:
+            if ec.count('.') == 3:
+                a, b, c, d = ec.split('.')
+                if b == '-' and c == '-' and d == '-':
+                    ec_lv1.add(ec)
+                elif c == '-' and d == '-':
+                    ec_lv2.add(ec)
+                elif d == '-':
+                    ec_lv3.add(ec)
+                else:
+                    ec_lv4.add(ec)
+            else:
+                print(ec)
+        ec_hier = generate_ec_hierarchy(ec_lv1, ec_lv2, ec_lv3, ec_lv4)
+        new_ecs = set()
+        for l1 in ec_hier:
+            if l1 not in ec_numbers:
+                new_ecs.add(l1)
+            for l2 in ec_hier[l1]:
+                if l2 not in ec_numbers:
+                    new_ecs.add(l2)
+                for l3 in ec_hier[l1][l2]:
+                    if l3 not in ec_numbers:
+                        new_ecs.add(l3)
+                    for l4 in ec_hier[l1][l2][l3]:
+                        if l4 not in ec_numbers:
+                            new_ecs.add(l4)
+        print('new_ecs', len(new_ecs))
+
+        raise NotImplementedError()
+
+    def get_link(self, edges_id, ids, payload_size=10000, rel_type='one_to_one', rev=False):
+        aql = f"""
+        FOR d IN {edges_id}
+            FILTER d._from IN @list
+            RETURN [d._from, d._to]
+        """
+        if rev:
+            aql = f"""
+            FOR d IN {edges_id}
+                FILTER d._to IN @list
+                RETURN [d._to, d._from]
+            """
+
+        res = {}
+
+        payload = []
+        for i in progress(ids):
+            payload.append(i)
+            if len(payload) > payload_size:
+                cursor = self.db.AQLQuery(aql, rawResults=True, bindVars={'list': payload})
+                if rel_type == 'one_to_one':
+                    self._collect_one_to_one(cursor, res)
+                elif rel_type == 'one_to_many':
+                    self._collect_one_to_many(cursor, res)
+                else:
+                    raise ValueError(f'bad rel_type {rel_type} expected one_to_one, one_to_many')
+
+        if len(payload) > 0:
+            cursor = self.db.AQLQuery(aql, rawResults=True, bindVars={'list': payload})
+            if rel_type == 'one_to_one':
+                self._collect_one_to_one(cursor, res)
+            elif rel_type == 'one_to_many':
+                self._collect_one_to_many(cursor, res)
+            else:
+                raise ValueError(f'bad rel_type {rel_type} expected one_to_one, one_to_many')
+
+        return res
 
     def load_graph(self, graph, proxies=None):
         if proxies is None:
