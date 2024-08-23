@@ -85,4 +85,4 @@ class DriverEtlNcbi:
                 # tax_doc = re.db['ncbi_taxonomy'][tax_id]
                 # tax_species_doc = re.db['ncbi_taxonomy'][tax_species_id]
             # print(i, tax_id, tax_species_id, tax_doc['rank'], tax_doc['scientific name'][0][0], tax_species_doc['rank'], tax_species_doc['scientific name'][0][0])
-        graph.summary()
+        return graph
