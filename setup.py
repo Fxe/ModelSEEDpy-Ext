@@ -30,6 +30,7 @@ setup(name='modelseedpy_ext',
           "cobra >= 0.17.1",
           "pymongo",
           "numpy",
+          "pyarrow",
           "lxml",
           "pyArango"
       ],

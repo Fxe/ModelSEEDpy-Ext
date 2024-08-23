@@ -1,6 +1,119 @@
 import logging
+from tqdm import tqdm
+from modelseedpy_ext.re.hash_seq import HashSeqList, HashSeq
+from modelseedpy import MSGenome
+from modelseedpy_ext.utils import sha_hex
 
 logger = logging.getLogger(__name__)
+
+
+def _process_contigs(contigs):
+    hash_list = HashSeqList()
+    contig_h_d = []
+    for contig in contigs.features:
+        seq = HashSeq(contig.seq)
+        hash_list.append(seq)
+        seq_h = seq.hash_value
+        contig_h_d.append([seq_h, contig.id, contig.description])
+    return {
+        'genome_h': hash_list.hash_value,
+        'contig_h': contig_h_d
+    }
+
+
+def process_files(files):
+    h_to_contig = {}
+    h_to_genome = {}
+    contig_descs = {}
+    genome_to_contig_h = {}
+    genome_to_contig_id = {}
+    genome_error = set()
+    file_to_hash = {}
+    for g in tqdm(files):
+        if g not in genome_to_contig_h and g not in genome_error:
+            if g.endswith('.fna.gz') or True:
+                try:
+                    path_fna = g
+                    genome_contigs = MSGenome.from_fasta2(path_fna, split=' ')
+                    hvals = _process_contigs(genome_contigs)
+                    file_to_hash[path_fna] = hvals['genome_h']
+                    if hvals['genome_h'] not in h_to_genome:
+                        h_to_genome[hvals['genome_h']] = set()
+                        genome_to_contig_h[hvals['genome_h']] = []
+                        genome_to_contig_id[hvals['genome_h']] = []
+                    h_to_genome[hvals['genome_h']].add(path_fna)
+                    for contig_h, contig_id, des in hvals['contig_h']:
+                        genome_to_contig_h[hvals['genome_h']].append(contig_h)
+                        genome_to_contig_id[hvals['genome_h']].append(contig_id)
+                        if contig_h not in h_to_contig:
+                            h_to_contig[contig_h] = set()
+                        h_to_contig[contig_h].add(contig_id)
+                        if contig_id not in contig_descs:
+                            contig_descs[contig_id] = set()
+                        contig_descs[contig_id].add(des)
+                except Exception as exxx:
+                    print(exxx)
+                    genome_error.add(g)
+                #if len(h_to_genome) > 10:
+                #    return file_to_hash, h_to_genome, contig_descs, h_to_contig, genome_to_contig_h, genome_to_contig_id, genome_error
+            else:
+                genome_error.add(g)
+        else:
+            genome_error.add(g)
+    return file_to_hash, h_to_genome, contig_descs, h_to_contig, genome_to_contig_h, genome_to_contig_id, genome_error
+
+
+def _process_old_style(gtdb_path, w_path='/scratch/fliu/data/gtdb/GCA/'):
+    h_to_contig = {}
+    h_to_genome = {}
+    genome_to_contig_h = {}
+    counter = 0
+    genome_error = set()
+
+    import os
+
+    for x in os.listdir(gtdb_path):
+        x_path = gtdb_path + '/' + x
+        if os.path.isdir(x_path):
+            for y in os.listdir(x_path):
+                y_path = x_path + '/' + y
+                if os.path.isdir(y_path):
+                    for z in os.listdir(y_path):
+                        z_path = y_path + '/' + z
+                        if os.path.isdir(z_path):
+                            for g in os.listdir(z_path):
+                                if g.startswith('GCA') and g not in genome_to_contig_h and g not in genome_error:
+                                    for filename in os.listdir(z_path + '/' + g):
+                                        if filename.endswith('.fna.gz'):
+                                            try:
+                                                genome_to_contig_h[g] = set()
+                                                path_fna = f'{z_path}/{g}/{filename}'
+                                                genome = MSGenome.from_fasta2(path_fna, split=' ')
+                                                w_group = counter // 10000
+
+                                                h_seq = HashSeqList()
+                                                for f in genome.features:
+                                                    hash_seq = HashSeq(f.seq)
+                                                    _h = hash_seq.hash_value
+                                                    genome_to_contig_h[g].add(_h)
+                                                    if _h not in h_to_contig:
+                                                        h_to_contig[_h] = set()
+                                                    h_to_contig[_h].add(f.id)
+                                                    h_seq.append(hash_seq)
+                                                hash_contig_set = h_seq.hash_value
+
+                                                if hash_contig_set not in h_to_genome:
+                                                    h_to_genome[hash_contig_set] = set()
+                                                    d_group = f'{w_path}/genome_set_{w_group}'
+                                                    if not os.path.exists(d_group):
+                                                        os.mkdir(d_group)
+                                                    genome.to_fasta(f'{d_group}/{hash_contig_set}.fna')
+                                                    counter += 1
+                                                h_to_genome[hash_contig_set].add(g)
+                                            except Exception as exp:
+                                                genome_error.add(g)
+
+    return h_to_genome, h_to_contig, genome_to_contig_h, counter, genome_error
 
 
 class KeggGenomeTable:

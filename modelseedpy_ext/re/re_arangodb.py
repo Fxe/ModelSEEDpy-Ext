@@ -88,6 +88,14 @@ class RE:
         """
         return set(self.db.AQLQuery(aql, batchSize=50000, rawResults=True))
 
+    def aql_filter(self, collection_id, filter_field, filter_values):
+        aql = f"""
+        FOR d IN {collection_id}
+            FILTER d.{filter_field} in @list
+            RETURN d
+        """
+        return list(self.db.AQLQuery(aql, batchSize=50000, rawResults=True, bindVars={'list': list(filter_values)}))
+
     @staticmethod
     def _collect_one_to_one(cursor, d: dict):
         for a, b in cursor:
