@@ -48,7 +48,9 @@ class DriverEtlNcbi:
                 _d = json.load(fh)
                 data[_d['_id']] = _d
 
-        self._etl_assemblies(data)
+        g = self._etl_assemblies(data)
+        g.summary()
+        self.re.load_graph(g)
 
     @staticmethod
     def _etl_assemblies(ncbi_assemblies):
