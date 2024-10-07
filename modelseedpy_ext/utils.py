@@ -7,6 +7,18 @@ def progress(ite):
         yield y
 
 
+def batch_iterator(x, sz):
+    _items = list(x)
+    batch_count = len(x) // sz
+
+    for i in range(batch_count + 1):
+        start = i * sz
+        end = start + sz
+        _y = _items[start:end]
+        if len(_y) > 0:
+            yield _y
+
+
 def sha_hex(s: str):
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 

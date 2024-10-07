@@ -1,6 +1,43 @@
 import subprocess
 import os
-import pyarrow as pa
+import polars as pl
+
+
+class ANISkaniMatrix:
+
+    def __init__(self, df_data):
+        self.df_data = df_data
+        df_scores_alexey.filter(pl.col("ANI") >= 95).group_by("Query_file", maintain_order=True).max()
+        pass
+
+    def filter_ani(self, ani):
+        return self.df_data.filter(pl.col("ANI") >= ani)
+
+    @staticmethod
+    def from_search_output(filename, sep='\t'):
+        import pyarrow as pa
+
+        float_types = {'ANI', 'Align_fraction_ref', 'Align_fraction_query'}
+
+        with open(filename, 'r') as fh:
+            header = fh.readline()
+
+            names = header.strip().split(sep)
+            col_number = len(names)
+            data = {n: [] for n in names}
+
+            line = fh.readline()
+            while line:
+                row = line.strip().split(sep)
+                for i in range(col_number):
+                    _d = row[i]
+                    if names[i] in float_types:
+                        _d = float(_d)
+                    data[names[i]].append(_d)
+                line = fh.readline()
+
+            pa_table = pa.Table.from_arrays([pa.array(data[n]) for n in names], names=names)
+            return ANISkaniMatrix(pl.from_arrow(pa_table))
 
 
 class ProgramSkani:
@@ -97,3 +134,5 @@ class ProgramSkani:
         if file_size.st_size > 0:
             fast_ani_result = pd.read_csv(output_file, header=None, sep="\t")
         return fast_ani_result, output
+
+

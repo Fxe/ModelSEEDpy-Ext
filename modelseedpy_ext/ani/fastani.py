@@ -26,6 +26,50 @@ class FastANIOutput:
         res.d_ani = d_ani
         return res
 
+    @staticmethod
+    def to_parquet(path, filename, _fn_g_name=None):
+        edges = {}
+        with open(path, 'r') as fh:
+            line = fh.readline()
+            while line:
+                if line:
+                    a, b, score, f1, f2 = line.strip().split('\t')
+                    if a != b:
+                        _e = (a, b)
+                        _e_rev = (b, a)
+                        if _e not in edges and _e_rev not in edges:
+                            edges[_e] = [float(score), None]
+                        elif _e_rev in edges:
+                            edges[_e_rev][1] = float(score)
+                    # a = a.split('/')[-1]
+                    # b = b.split('/')[-1]
+                line = fh.readline()
+
+        _data = {
+            'h1': [],
+            'h2': [],
+            'ani': [],
+        }
+        for p in edges:
+            _s1, _s2 = edges[p]
+            if _s1 and _s2:
+                _sq_err = (_s1 - _s2) ** 2
+                if _sq_err > 1:
+                    # print(p, _s1, _s2, _sq_err)
+                    pass
+                else:
+                    _data['h1'].append(_fn_g_name(p[0]))
+                    _data['h2'].append(_fn_g_name(p[1]))
+                    _data['ani'].append(_s1)
+
+        import pyarrow as pa
+        ani_pq = pa.Table.from_arrays([
+            pa.array(_data['h1']),
+            pa.array(_data['h2']),
+            pa.array(_data['ani'])], names=['h1', 'h2', 'ani'])
+        import pyarrow.parquet as pq
+        pq.write_table(ani_pq, filename)
+
 
 class ProgramANI:
 

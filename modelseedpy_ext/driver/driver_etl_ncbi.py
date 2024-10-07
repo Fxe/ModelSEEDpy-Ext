@@ -1,4 +1,5 @@
 from modelseedpy_ext.re.etl.transform_graph import TransformGraph, Node
+from modelseedpy_ext.utils import batch_iterator
 import os
 import json
 
@@ -9,6 +10,7 @@ class DriverEtlNcbi:
         self.assembly_cache_path = assembly_cache_path
         self.re = re
         self.extract_ncbi = extract_ncbi
+        self.ncbi_batch_size = 10
 
     def etl_ncbi_assembly(self, ncbi_ids):
         # scan gca
@@ -19,12 +21,13 @@ class DriverEtlNcbi:
                                            ['ncbi_assembly_gcf_acc/' + x for x in ncbi_ids], rev=True)
 
         # get missing
-        missing = ncbi_ids - set(gca_to_assembly.keys()) - set(gcf_to_assembly.keys())
+        missing = set(ncbi_ids) - {x.split('/')[1] for x in gca_to_assembly.keys()}
+        missing = missing - {x.split('/')[1] for x in gcf_to_assembly.keys()}
 
         # run api for ids
         missing_ncbi_assembly_ids = set()
-        for i in missing:
-            res = self.extract_ncbi.esearch('assembly', i.split('/')[1])
+        for batch_ncbi_ids in batch_iterator(missing, self.ncbi_batch_size):
+            res = self.extract_ncbi.esearch('assembly', ' or '.join(batch_ncbi_ids))
             if res and 'ids' in res:
                 missing_ncbi_assembly_ids |= res.get('ids', set())
 
@@ -73,7 +76,8 @@ class DriverEtlNcbi:
                 node_taxa = graph.add_transform_node2(Node(str(tax_id), 'ncbi_taxonomy', data={'_proxy': True}))
                 graph.add_transform_edge2(node_assembly, node_taxa, 'ncbi_assembly_has_ncbi_taxonomy')
             if tax_species_id:
-                node_taxa_species = graph.add_transform_node2(Node(str(tax_species_id), 'ncbi_taxonomy', data={'_proxy': True}))
+                node_taxa_species = graph.add_transform_node2(
+                    Node(str(tax_species_id), 'ncbi_taxonomy', data={'_proxy': True}))
                 graph.add_transform_edge2(node_assembly, node_taxa_species, 'ncbi_assembly_has_ncbi_taxonomy_species')
 
             if ncbi_gb_acc is not None:
