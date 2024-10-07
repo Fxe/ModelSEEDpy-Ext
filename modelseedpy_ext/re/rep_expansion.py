@@ -1,6 +1,6 @@
 import os
 from modelseedpy_ext.utils import progress
-from modelseedpy_ext.re.core.genome import REGenome
+from modelseedpy_ext.re.core.genome import REAssembly
 
 
 def _read_skani_out(filename):
@@ -161,7 +161,7 @@ class NameThisLater:
             filename = f'/scratch/fliu/data/kbase/cache/handle/{fasta_handle_ref}'
             if not os.path.exists(filename):
                 self.kbase_api.download_file_from_kbase2(fasta_handle_ref, filename)
-            self.contigs[genome_id] = REGenome.from_fasta(filename)
+            self.contigs[genome_id] = REAssembly.from_fasta(filename)
             self.contig_filename[genome_id] = filename
 
         self.genome_to_contig_h = {}
