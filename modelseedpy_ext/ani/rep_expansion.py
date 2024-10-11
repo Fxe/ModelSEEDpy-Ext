@@ -178,7 +178,7 @@ class NameThisLater:
         h_to_file = {}
         for genome_id, h in self.genome_to_contig_h.items():
             if h not in h_to_file:
-                h_to_file[h] = self.genome_to_contig_h[genome_id]
+                h_to_file[h] = self.contig_filename[genome_id]
 
         library_files = set(h_to_file.values())
 

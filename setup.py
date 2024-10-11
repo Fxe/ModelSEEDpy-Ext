@@ -32,6 +32,7 @@ setup(name='modelseedpy_ext',
           "numpy",
           "pyarrow",
           "lxml",
-          "pyArango"
+          "pyArango",
+          "polars"
       ],
       zip_safe=True)
