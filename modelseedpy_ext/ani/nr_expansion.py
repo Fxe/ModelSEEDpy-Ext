@@ -96,8 +96,9 @@ class NrExp:
     def catalog_new_representatives(self, exp_method):
         # save to db
         # save library
-        with open(f'{self.path_to_exp_library}/iteration_{self.rep_exp_counter}', 'w') as fh:
-            for k in exp_method.clusters:
-                fh.write(k + '\n')
+        #with open(f'{self.path_to_exp_library}/iteration_{self.rep_exp_counter}', 'w') as fh:
+        #    for k in exp_method.clusters:
+        #        fh.write(k + '\n')
         # sketch library
-        #ani_method.build_library()
+        #self.ani_method.b
+        pass
