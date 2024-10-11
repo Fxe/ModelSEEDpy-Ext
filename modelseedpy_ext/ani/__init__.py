@@ -31,9 +31,14 @@ class GenomeReference:
     def from_kbase(info):
         pass
 
+    def get_path(self):
+        return Path(self.path)
+
+    def filename(self):
+        return self.get_path().name
+
     def get_absolute_path(self):
-        _path = Path(self.path)
-        return str(_path.absolute())
+        return str(self.get_path().absolute())
 
 
 class ANIMethodSkani(ANIMethod):
@@ -85,4 +90,7 @@ class ANIMethodFastANI(ANIMethod):
         return output_filename
 
     def distance(self, library_query, library_reference, output_filename):
-        return self.program.run(library_query, library_reference, output_filename, threads=self.threads)
+        return self.program.run(library_query,
+                                library_file=library_reference,
+                                output_file=output_filename,
+                                threads=self.threads)
