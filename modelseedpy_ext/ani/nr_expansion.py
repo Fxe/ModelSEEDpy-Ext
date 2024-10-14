@@ -1,5 +1,6 @@
 from modelseedpy_ext.ani.skani import _read_search_output_as_parquet, _read_triangle_output_as_parquet
 from modelseedpy_ext.ani import GenomeReference
+import pandas as pd
 import polars as pl
 
 
@@ -86,29 +87,35 @@ class NrExp:
         self.rep_exp_libraries = {}
         self.ani_radius = ani_radius
 
-    def run_ani(self, query_library, rep_library, genome_files):
+    def run_ani(self, query_library, rep_library):
 
         if rep_library == 'gtdb_r220_rep' and query_library in self.MOCK_PRE_COMP_DATA:
             file_vs_rep = self.MOCK_PRE_COMP_DATA[query_library][1]
+            print('load pre calc dataset: ', file_vs_rep)
             return pl.from_arrow(_read_search_output_as_parquet(file_vs_rep, sep='\t'))
         elif query_library == rep_library and query_library in self.MOCK_PRE_COMP_DATA:
             file_vs_self = self.MOCK_PRE_COMP_DATA[query_library][2]
+            print('load pre calc dataset: ', file_vs_self)
             return pl.from_arrow(_read_triangle_output_as_parquet(file_vs_self, sep='\t'))
         else:
+            genome_files = self.MOCK_PRE_COMP_DATA[query_library][0]
             self.ani_method.distance(genome_files,
                                      rep_library[:-11],
                                      f'{self.path_to_exp_library}/{query_library}_{rep_library}.out')
         return None
 
-    def expand(self, query_library, genome_files):
+    def expand(self, query_library):
+        # library_members = self.dao_ani.get_members_from_library(query_library)
+        library_members = set(pd.read_csv(self.MOCK_PRE_COMP_DATA[query_library][0], header=None).to_dict()[0].values())
+        print('library members:', len(library_members))
 
         added = set()
-        candidates = set()
+        candidates = set(library_members)
 
         for exp_library in self.rep_exp_libraries:
             print(exp_library)
             if exp_library == 'gtdb_r220_rep':
-                df_vs_rep = self.run_ani(query_library, exp_library, genome_files)
+                df_vs_rep = self.run_ani(query_library, exp_library)
                 print(f'number of ani pairs ({exp_library}):', len(df_vs_rep))
 
                 # select all members with ANI >= radius
@@ -130,7 +137,7 @@ class NrExp:
                 candidates -= added
                 print('members candidate to new rep clusters:', len(candidates))
             
-        df_all_vs_all = self.run_ani(query_library, query_library, genome_files)
+        df_all_vs_all = self.run_ani(query_library, query_library)
         df_all_vs_all = df_all_vs_all.filter(pl.col(
             "Query_file1").is_in(candidates) & pl.col(
             "Query_file2").is_in(candidates)).filter(pl.col("ANI") >= self.ani_radius)
@@ -138,6 +145,7 @@ class NrExp:
         exp_method = ExpMethod(df_all_vs_all)
         visited = exp_method.compute_new_clusters(candidates)
 
+        print('visited nodes:', len(visited))
         print('new clusters', len(exp_method.clusters))
 
         self.catalog_new_representatives(exp_method, query_library)
