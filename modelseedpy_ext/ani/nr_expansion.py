@@ -36,7 +36,7 @@ class ExpMethod:
         rep = self._get_best_quality(candidates)
 
         # setup singleton cluster
-        self.clusters[rep][rep] = 100  # self ani assume 100
+        self.clusters[rep] = {rep: 100}  # self ani assume 100
 
         # get entities in the candidate pool that has ANI range of ani_radius
         for o in self.all_vs_all.filter(
@@ -99,12 +99,12 @@ class NrExp:
             return pl.from_arrow(_read_triangle_output_as_parquet(file_vs_self, sep='\t'))
         else:
             genome_files = self.MOCK_PRE_COMP_DATA[query_library][0]
-            self.ani_method.distance(genome_files,
+            ani_matrix, output, cmd = self.ani_method.distance(genome_files,
                                      rep_library[:-11],
                                      f'{self.path_to_exp_library}/{query_library}_{rep_library}.out')
-        return None
+            return ani_matrix
 
-    def expand(self, query_library):
+    def expand(self, query_library):s
         # library_members = self.dao_ani.get_members_from_library(query_library)
         library_members = set(pd.read_csv(self.MOCK_PRE_COMP_DATA[query_library][0], header=None).to_dict()[0].values())
         print('library members:', len(library_members))
@@ -114,28 +114,28 @@ class NrExp:
 
         for exp_library in self.rep_exp_libraries:
             print(exp_library)
-            if exp_library == 'gtdb_r220_rep':
-                df_vs_rep = self.run_ani(query_library, exp_library)
-                print(f'number of ani pairs ({exp_library}):', len(df_vs_rep))
 
-                # select all members with ANI >= radius
-                to_previous_representatives = df_vs_rep.filter(
-                    pl.col("ANI") >= self.ani_radius).group_by(
-                    "Query_file", maintain_order=True).max()
+            df_vs_rep = self.run_ani(query_library, exp_library)
+            print(f'number of ani pairs ({exp_library}):', len(df_vs_rep))
 
-                for o in to_previous_representatives.rows(named=True):
-                    rep = o['Ref_file']
-                    genome_id = o['Query_file']
-                    if genome_id not in self.member_to_cluster:
+            # select all members with ANI >= radius
+            to_previous_representatives = df_vs_rep.filter(
+                pl.col("ANI") >= self.ani_radius).group_by(
+                "Query_file", maintain_order=True).max()
 
-                        if rep not in self.rep_clusters:
-                            self.rep_clusters[rep] = {}
-                        self.rep_clusters[rep][genome_id] = o['ANI']
-                        self.member_to_cluster[genome_id] = rep
-                        added.add(o['Query_file'])
-                print('members added to rep clusters:', len(added))
-                candidates -= added
-                print('members candidate to new rep clusters:', len(candidates))
+            for o in to_previous_representatives.rows(named=True):
+                rep = o['Ref_file']
+                genome_id = o['Query_file']
+                if genome_id not in self.member_to_cluster:
+
+                    if rep not in self.rep_clusters:
+                        self.rep_clusters[rep] = {}
+                    self.rep_clusters[rep][genome_id] = o['ANI']
+                    self.member_to_cluster[genome_id] = rep
+                    added.add(o['Query_file'])
+            print('members added to rep clusters:', len(added))
+            candidates -= added
+            print('members candidate to new rep clusters:', len(candidates))
             
         df_all_vs_all = self.run_ani(query_library, query_library)
         df_all_vs_all = df_all_vs_all.filter(pl.col(
