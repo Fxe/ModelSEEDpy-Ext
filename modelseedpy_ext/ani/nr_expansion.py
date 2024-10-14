@@ -1,4 +1,5 @@
 from modelseedpy_ext.ani.skani import _read_search_output_as_parquet, _read_triangle_output_as_parquet
+from modelseedpy_ext.ani import GenomeReference
 import polars as pl
 
 
@@ -58,13 +59,16 @@ class NrExp:
         self.rep_clusters = {}
         self.dao_ani = None
         self.ani_method = None
+        self.rep_exp_libraries = {}
+        self.ani_radius = 95
 
-    def expand(self, file_vs_rep, file_vs_self):
+    def expand(self, exp_id, genome_files, file_vs_rep, file_vs_self):
+
         df_vs_rep = pl.from_arrow(_read_search_output_as_parquet(file_vs_rep, sep='\t'))
         print('number of ani pairs:', len(df_vs_rep))
 
         to_previous_representatives = df_vs_rep.filter(
-            pl.col("ANI") >= 95).group_by(
+            pl.col("ANI") >= self.ani_radius).group_by(
             "Query_file", maintain_order=True).max()
 
         added = set()
@@ -77,6 +81,12 @@ class NrExp:
             added.add(o['Query_file'])
         print('members added to rep clusters:', len(added))
 
+        for exp_iteration, exp_library in self.rep_exp_libraries.items():
+            self.ani_method.distance(genome_files,
+                                     exp_library[:-11],
+                                     f'{self.path_to_exp_library}/{exp_id}_iteration{exp_iteration}.out')
+            print(exp_library)
+
         candidates_for_representatives = df_vs_rep.filter(~pl.col("Query_file").is_in(added))
         candidates = set(candidates_for_representatives['Query_file'])
         print('members candidate for new rep clusters:', len(candidates))
@@ -84,7 +94,7 @@ class NrExp:
         df_all_vs_all = pl.from_arrow(_read_triangle_output_as_parquet(file_vs_self, sep='\t'))
         df_all_vs_all = df_all_vs_all.filter(pl.col(
             "Query_file1").is_in(candidates) & pl.col(
-            "Query_file2").is_in(candidates)).filter(pl.col("ANI") >= 95)
+            "Query_file2").is_in(candidates)).filter(pl.col("ANI") >= self.ani_radius)
 
         exp_method = ExpMethod(df_all_vs_all)
         visited = exp_method.compute_new_clusters(candidates)
@@ -93,12 +103,13 @@ class NrExp:
 
         self.catalog_new_representatives(exp_method)
 
+        self.rep_exp_counter += 1
+
     def catalog_new_representatives(self, exp_method):
-        # save to db
-        # save library
-        #with open(f'{self.path_to_exp_library}/iteration_{self.rep_exp_counter}', 'w') as fh:
-        #    for k in exp_method.clusters:
-        #        fh.write(k + '\n')
-        # sketch library
-        #self.ani_method.b
-        pass
+        if len(exp_method.clusters) > 0:
+            genome_files = [GenomeReference.from_file(x) for x in exp_method.clusters.keys()]
+            exp_library_file = f'{self.path_to_exp_library}/iteration_{self.rep_exp_counter}.txt'
+            ani_library = self.ani_method.build_library(genome_files, exp_library_file)
+            self.rep_exp_libraries[self.rep_exp_counter] = ani_library
+
+            self.rep_clusters.update(exp_method.clusters)

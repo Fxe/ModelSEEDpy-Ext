@@ -132,11 +132,12 @@ class NameThisLater:
         return NameThisLater(genome_refs, kbase_api)
 
     @staticmethod
-    def from_workspace(kbase_api, ws_id):
+    def from_workspaces(kbase_api, ws_ids):
         genome_refs = set()
-        for o in kbase_api.list_workspace(ws_id):
-            if o.type == 'KBaseGenomes.Genome':
-                genome_refs.add(o)
+        for ws_id in ws_ids:
+            for o in kbase_api.list_workspace(ws_id):
+                if o.type == 'KBaseGenomes.Genome':
+                    genome_refs.add(o)
         return NameThisLater(genome_refs, kbase_api)
 
     def run(self):
