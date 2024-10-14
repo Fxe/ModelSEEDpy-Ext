@@ -25,6 +25,9 @@ def _read_search_output_as_parquet(filename, sep='\t'):
                 data[names[i]].append(_d)
             line = fh.readline()
 
+        if len(data[names[0]]) == 0:
+            return None
+
         pa_table = pa.Table.from_arrays([pa.array(data[n]) for n in names], names=names)
         return pa_table
 

@@ -53,7 +53,6 @@ class ExpMethod:
 
 
 class NrExp:
-
     MOCK_PRE_COMP_DATA = {
         'fastgenomics': (
             '/scratch/fliu/data/ani/library_morgan.txt',
@@ -98,13 +97,16 @@ class NrExp:
             print('load pre calc dataset: ', file_vs_self)
             return pl.from_arrow(_read_triangle_output_as_parquet(file_vs_self, sep='\t'))
         else:
+            rep_library_file = self.rep_exp_libraries[rep_library][:-11]
             genome_files = self.MOCK_PRE_COMP_DATA[query_library][0]
+            print(f'compute new ANI {genome_files} {rep_library_file}')
             ani_matrix, output, cmd = self.ani_method.distance(genome_files,
-                                     rep_library[:-11],
-                                     f'{self.path_to_exp_library}/{query_library}_{rep_library}.out')
+                                                               rep_library_file,
+                                                               f'{self.path_to_exp_library}/{query_library}_{rep_library}.out')
+            
             return ani_matrix
 
-    def expand(self, query_library):s
+    def expand(self, query_library):
         # library_members = self.dao_ani.get_members_from_library(query_library)
         library_members = set(pd.read_csv(self.MOCK_PRE_COMP_DATA[query_library][0], header=None).to_dict()[0].values())
         print('library members:', len(library_members))
@@ -136,7 +138,7 @@ class NrExp:
             print('members added to rep clusters:', len(added))
             candidates -= added
             print('members candidate to new rep clusters:', len(candidates))
-            
+
         df_all_vs_all = self.run_ani(query_library, query_library)
         df_all_vs_all = df_all_vs_all.filter(pl.col(
             "Query_file1").is_in(candidates) & pl.col(
@@ -167,4 +169,4 @@ class NrExp:
                             if m not in self.member_to_cluster:
                                 self.member_to_cluster[m] = k
                                 self.rep_clusters[k][m] = members[m]
-            #self.rep_clusters.update(exp_method.clusters)
+            # self.rep_clusters.update(exp_method.clusters)
