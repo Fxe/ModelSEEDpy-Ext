@@ -103,7 +103,8 @@ class NrExp:
             ani_matrix, output, cmd = self.ani_method.distance(genome_files,
                                                                rep_library_file,
                                                                f'{self.path_to_exp_library}/{query_library}_{rep_library}.out')
-            
+            if ani_matrix is not None:
+                return pl.from_arrow(ani_matrix)
             return ani_matrix
 
     def expand(self, query_library):
@@ -115,44 +116,53 @@ class NrExp:
         candidates = set(library_members)
 
         for exp_library in self.rep_exp_libraries:
+            if len(candidates) == 0:
+                print('STOP all members assigned to clusters')
+                break
             print(exp_library)
 
             df_vs_rep = self.run_ani(query_library, exp_library)
-            print(f'number of ani pairs ({exp_library}):', len(df_vs_rep))
+            if df_vs_rep is not None:
+                print(f'number of ani pairs ({exp_library}):', len(df_vs_rep))
 
-            # select all members with ANI >= radius
-            to_previous_representatives = df_vs_rep.filter(
-                pl.col("ANI") >= self.ani_radius).group_by(
-                "Query_file", maintain_order=True).max()
+                # select all members with ANI >= radius
+                to_previous_representatives = df_vs_rep.filter(
+                    pl.col("ANI") >= self.ani_radius).group_by(
+                    "Query_file", maintain_order=True).max()
 
-            for o in to_previous_representatives.rows(named=True):
-                rep = o['Ref_file']
-                genome_id = o['Query_file']
-                if genome_id not in self.member_to_cluster:
+                for o in to_previous_representatives.rows(named=True):
+                    rep = o['Ref_file']
+                    genome_id = o['Query_file']
+                    if genome_id not in self.member_to_cluster:
 
-                    if rep not in self.rep_clusters:
-                        self.rep_clusters[rep] = {}
-                    self.rep_clusters[rep][genome_id] = o['ANI']
-                    self.member_to_cluster[genome_id] = rep
-                    added.add(o['Query_file'])
-            print('members added to rep clusters:', len(added))
-            candidates -= added
-            print('members candidate to new rep clusters:', len(candidates))
+                        if rep not in self.rep_clusters:
+                            self.rep_clusters[rep] = {}
+                        self.rep_clusters[rep][genome_id] = o['ANI']
+                        self.member_to_cluster[genome_id] = rep
+                        added.add(o['Query_file'])
+                print('members added to rep clusters:', len(added))
+                candidates -= added
+                print('members candidate to new rep clusters:', len(candidates))
+            else:
+                print(f'found no matches against {exp_library}')
 
-        df_all_vs_all = self.run_ani(query_library, query_library)
-        df_all_vs_all = df_all_vs_all.filter(pl.col(
-            "Query_file1").is_in(candidates) & pl.col(
-            "Query_file2").is_in(candidates)).filter(pl.col("ANI") >= self.ani_radius)
+        if len(candidates) > 0:
+            print('Generate new candidate clusters')
 
-        exp_method = ExpMethod(df_all_vs_all)
-        visited = exp_method.compute_new_clusters(candidates)
+            df_all_vs_all = self.run_ani(query_library, query_library)
+            df_all_vs_all = df_all_vs_all.filter(pl.col(
+                "Query_file1").is_in(candidates) & pl.col(
+                "Query_file2").is_in(candidates)).filter(pl.col("ANI") >= self.ani_radius)
 
-        print('visited nodes:', len(visited))
-        print('new clusters', len(exp_method.clusters))
+            exp_method = ExpMethod(df_all_vs_all)
+            visited = exp_method.compute_new_clusters(candidates)
 
-        self.catalog_new_representatives(exp_method, query_library)
+            print('visited nodes:', len(visited))
+            print('new clusters', len(exp_method.clusters))
 
-        self.rep_exp_counter += 1
+            self.catalog_new_representatives(exp_method, query_library)
+
+            self.rep_exp_counter += 1
 
     def catalog_new_representatives(self, exp_method, query_library):
         if len(exp_method.clusters) > 0:

@@ -121,6 +121,10 @@ class NameThisLater:
         self.contig_filename = None
 
     @staticmethod
+    def from_genome_refs(kbase_api, genome_refs):
+        return NameThisLater(genome_refs, kbase_api)
+
+    @staticmethod
     def from_genome_set(kbase_api, genome_set_id_or_ref, ws_id=None):
         genomes_set = kbase_api.get_from_ws(genome_set_id_or_ref, ws_id)
         # check type
