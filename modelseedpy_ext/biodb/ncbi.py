@@ -6,22 +6,33 @@ from modelseedpy_ext.re.core.genome import GffRecord
 
 def _from_str(s):
     contig_id, source, feature_type, start, end, score, strand, phase, attr_str = s.strip().split('\t')
+    attr_str = attr_str[:-1] if attr_str[-1] == ';' else attr_str
     attr = dict([x.split('=') for x in attr_str.split(';')])
     return GffRecord(contig_id, source, feature_type, int(start), int(end), score, strand, phase, attr)
 
 
 def _read_gff_features(f):
-    import gzip
+    if f.endswith('.gz'):
+        import gzip
 
-    with gzip.open(f, "rb") as fh:
-        features_gff = []
-        _data = fh.read().decode("utf-8")
-        for line in _data.split('\n'):
-            if not line.startswith('#'):
-                if line:
-                    features_gff.append(_from_str(line))
+        with gzip.open(f, "rb") as fh:
+            features_gff = []
+            _data = fh.read().decode("utf-8")
+            for line in _data.split('\n'):
+                if not line.startswith('#'):
+                    if line:
+                        features_gff.append(_from_str(line))
 
-        return features_gff
+            return features_gff
+    else:
+        with open(f, "r") as fh:
+            features_gff = []
+            _data = fh.read()
+            for line in _data.split('\n'):
+                if not line.startswith('#'):
+                    if line:
+                        features_gff.append(_from_str(line))
+            return features_gff
 
 
 class NCBIAssembly:
