@@ -4,7 +4,9 @@ from modelseedpy_ext.re.hash_seq import HashSeqList, HashSeq
 
 class GffRecord:
 
-    def __init__(self, contig_id, source, feature_type, start, end, score, strand, phase, attr):
+    def __init__(self, contig_id: str, source: str,
+                 feature_type,
+                 start: int, end: int, score, strand, phase, attr):
         self.contig_id = contig_id
         self.source = source
         self.feature_type = feature_type
@@ -25,6 +27,12 @@ class GffRecord:
         return '\t'.join([str(x) for x in [self.contig_id, self.source, self.feature_type,
                                            self.start, self.end, self.score, self.strand, self.phase,
                                            self.get_attribute_string()]])
+
+    @staticmethod
+    def from_str(s):
+        contig_id, source, feature_type, start, end, score, strand, phase, attr_str = s.strip().split('\t')
+        attr = dict([x.split('=') for x in attr_str.split(';')])
+        return GffRecord(contig_id, source, feature_type, int(start), int(end), score, strand, phase, attr)
 
 
 def write_fna_fai(file_fna_fai, genome_assembly):

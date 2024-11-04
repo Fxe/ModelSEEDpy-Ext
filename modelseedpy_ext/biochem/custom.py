@@ -491,3 +491,4 @@ REACTION_RENAME = {
     'rxn01387_c': 'icd',
     'rxn00256_c': 'ACLY',
 }
+
