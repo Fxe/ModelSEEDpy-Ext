@@ -6,6 +6,7 @@ logger = logging.getLogger(__name__)
 
 
 class ETLTransformUniprot(ETLTransformGraph):
+
     def __init__(self, seq_store_protein, uniprot_type="sprot"):
         super().__init__()
         self.seq_store_protein = seq_store_protein

@@ -46,7 +46,8 @@ class SomeETL:
     def _t_genome(self, features_gff, genome_cds, genome_contigs, contig_set_hash, contig_id_to_hash):
 
         proteins_read = set()
-        for f in features_gff:
+        for f_index in range(len(features_gff)):
+            f = features_gff[f_index]
             self.data_features[self.feature_auto_id] = {
                 'start': f.start,
                 'end': f.end,
@@ -71,10 +72,14 @@ class SomeETL:
                         seq = seq.reverse_complement()
                     seq_from_dna = str(seq.translate())[:-1]
                     eq = feature_cds.seq == seq_from_dna
-                    if not eq:
-                        aligner = Align.PairwiseAligner()
-                        res = aligner.align(feature_cds.seq, seq_from_dna)
-                        self.data_features[self.feature_auto_id]['dna_protein_aligment_score'] = res.score
+                    if not eq and len(seq_from_dna) > 0:
+                        try:
+                            aligner = Align.PairwiseAligner()
+                            res = aligner.align(feature_cds.seq, seq_from_dna)
+                            self.data_features[self.feature_auto_id]['dna_protein_aligment_score'] = res.score
+                        except ValueError as ex:
+                            print('error', f_index)
+                            raise ex
                     else:
                         self.data_features[self.feature_auto_id]['dna_protein_aligment_score'] = len(feature_cds.seq)
                         # print(eq, f.contig_id, f.start, f.end, f.strand, len(feature_cds.seq), len(seq_from_dna), res.score)

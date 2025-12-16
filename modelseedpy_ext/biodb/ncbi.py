@@ -4,35 +4,7 @@ from modelseedpy.core import MSGenome
 from modelseedpy_ext.re.core.genome import GffRecord
 
 
-def _from_str(s):
-    contig_id, source, feature_type, start, end, score, strand, phase, attr_str = s.strip().split('\t')
-    attr_str = attr_str[:-1] if attr_str[-1] == ';' else attr_str
-    attr = dict([x.split('=') for x in attr_str.split(';')])
-    return GffRecord(contig_id, source, feature_type, int(start), int(end), score, strand, phase, attr)
-
-
-def _read_gff_features(f):
-    if f.endswith('.gz'):
-        import gzip
-
-        with gzip.open(f, "rb") as fh:
-            features_gff = []
-            _data = fh.read().decode("utf-8")
-            for line in _data.split('\n'):
-                if not line.startswith('#'):
-                    if line:
-                        features_gff.append(_from_str(line))
-
-            return features_gff
-    else:
-        with open(f, "r") as fh:
-            features_gff = []
-            _data = fh.read()
-            for line in _data.split('\n'):
-                if not line.startswith('#'):
-                    if line:
-                        features_gff.append(_from_str(line))
-            return features_gff
+FTP_URL_PREFIX = "ftp://ftp.ncbi.nlm.nih.gov"
 
 
 class NCBIAssembly:
@@ -45,15 +17,15 @@ class NCBIAssembly:
 
     @property
     def cwd_ftp_path_rs(self):
-        if self.ftp_path_rs and self.ftp_path_rs.startswith('ftp://ftp.ncbi.nlm.nih.gov'):
+        if self.ftp_path_rs and self.ftp_path_rs.startswith(FTP_URL_PREFIX):
             _url_p = self.ftp_path_rs.split('/')
-            return self.ftp_path_rs.split('ftp://ftp.ncbi.nlm.nih.gov')[1]
+            return self.ftp_path_rs.split(FTP_URL_PREFIX)[1]
 
         return None
 
     @property
     def cwd_local_path_rs(self):
-        if self.ftp_path_rs and self.ftp_path_rs.startswith('ftp://ftp.ncbi.nlm.nih.gov'):
+        if self.ftp_path_rs and self.ftp_path_rs.startswith(FTP_URL_PREFIX):
             _url_p = self.ftp_path_rs.split('/')
             return f"{self.cache_folder}/{'/'.join(_url_p[3:])}"
 
@@ -61,15 +33,15 @@ class NCBIAssembly:
 
     @property
     def cwd_ftp_path_gb(self):
-        if self.ftp_path_gb and self.ftp_path_gb.startswith('ftp://ftp.ncbi.nlm.nih.gov'):
+        if self.ftp_path_gb and self.ftp_path_gb.startswith(FTP_URL_PREFIX):
             _url_p = self.ftp_path_gb.split('/')
-            return self.ftp_path_gb.split('ftp://ftp.ncbi.nlm.nih.gov')[1]
+            return self.ftp_path_gb.split(FTP_URL_PREFIX)[1]
 
         return None
 
     @property
     def cwd_local_path_gb(self):
-        if self.ftp_path_gb and self.ftp_path_gb.startswith('ftp://ftp.ncbi.nlm.nih.gov'):
+        if self.ftp_path_gb and self.ftp_path_gb.startswith(FTP_URL_PREFIX):
             _url_p = self.ftp_path_gb.split('/')
             return f"{self.cache_folder}/{'/'.join(_url_p[3:])}"
 

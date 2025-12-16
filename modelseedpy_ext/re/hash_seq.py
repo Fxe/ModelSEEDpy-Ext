@@ -7,8 +7,10 @@ def _hash_string(s):
 
 class HashSeq(str):
 
-    def __new__(cls, v):
+    def __new__(cls, v, strip_ending_star=True):
         # print('validate!!', v)
+        if strip_ending_star:
+            v = HashSeq.strip_ending_star(v)
         instance = super().__new__(cls, v.upper())
         return instance
 
@@ -16,6 +18,12 @@ class HashSeq(str):
     def hash_value(self):
         h = _hash_string(self)
         return h
+
+    @staticmethod
+    def strip_ending_star(s):
+        if s.endswith('*'):
+            return s[:-1]
+        return s
 
 
 class HashSeqList(list):

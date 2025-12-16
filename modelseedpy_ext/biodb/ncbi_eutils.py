@@ -245,11 +245,10 @@ def parse_doc_sum(t):
 
 class NcbiEutils:
 
-    def __init__(self, api_key=None):
+    def __init__(self, api_key: str = None, cache_dir: str = None):
         self.base_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
         self.api_key = api_key
-        self.cache_dir = None
-        pass
+        self.cache_dir = cache_dir
 
     @staticmethod
     def build_url_params(p):
@@ -332,6 +331,9 @@ class NcbiEutils:
 
         return res.content
 
+    def efetch(self):
+        pass
+
     def esummary(self, db, record_id, ret_mode="xml"):
         content = self._get_eutils_summary_content(db, record_id, ret_mode)
         tree = ET.fromstring(content)
@@ -354,3 +356,44 @@ class NcbiEutils:
             self.base_url + "/elink.fcgi?" + self.build_url_params(params)
         )
         return res
+
+
+class NcbiEutilsCacheMongo(NcbiEutils):
+
+    DB_COLLECTION = {
+        'assembly': 'ncbi_assembly',
+        'bioproject': 'ncbi_bioproject',
+        'nuccore': 'ncbi_nuccore',
+        'protein': 'ncbi_protein',
+    }
+
+    def __init__(self, api_key, mongo_database):
+        self.database = mongo_database
+        super().__init__(api_key=api_key)
+
+    def esummary(self, db, record_id, ret_mode="xml"):
+        col_ncbi_assembly = self.database[NcbiEutilsCacheMongo.DB_COLLECTION[db]]
+
+        logger.debug('search cache')
+
+        doc = col_ncbi_assembly.find_one({'_id': record_id})
+
+        if doc is None:
+            logger.debug('fetch live')
+
+            ret = super().esummary(db, record_id, ret_mode)
+            ret = ret[0] if len(ret) > 1 else ret
+            ret = ret[0] if len(ret) > 1 else ret
+
+            print(ret)
+
+            if len(ret) != 0:
+                logger.debug('insert result in cache')
+                ret['_id'] = record_id
+                col_ncbi_assembly.insert_one(ret)
+
+                doc = ret
+            else:
+                raise ValueError(f'invalid query {db}:{record_id}')
+
+        return doc

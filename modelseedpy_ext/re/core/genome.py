@@ -1,5 +1,89 @@
 from modelseedpy.core.msgenome import MSGenome, read_fasta2
 from modelseedpy_ext.re.hash_seq import HashSeqList, HashSeq
+from collections import Counter
+
+
+def _from_str(s):
+    contig_id, source, feature_type, start, end, score, strand, phase, attr_str = s.strip().split('\t')
+    attr_str = attr_str[:-1] if attr_str[-1] == ';' else attr_str
+    attr = dict([x.split('=') for x in attr_str.split(';')])
+    return GffRecord(contig_id, source, feature_type, int(start), int(end), score, strand, phase, attr)
+
+
+def _read_gff_features(f):
+    if f.endswith('.gz'):
+        import gzip
+
+        with gzip.open(f, "rb") as fh:
+            features_gff = []
+            _data = fh.read().decode("utf-8")
+            for line in _data.split('\n'):
+                if not line.startswith('#'):
+                    if line:
+                        features_gff.append(_from_str(line))
+
+            return features_gff
+    else:
+        with open(f, "r") as fh:
+            features_gff = []
+            _data = fh.read()
+            for line in _data.split('\n'):
+                if not line.startswith('#'):
+                    if line:
+                        features_gff.append(_from_str(line))
+            return features_gff
+
+
+class CDMContigSet:
+
+    def __init__(self, sha256):
+        self.sha256 = sha256
+        self.contigs = []
+
+
+class CDMContig:
+
+    def __init__(self, contig_set_id: str, seq: str):
+        #self.seq = seq
+        self.contig_set_id = contig_set_id
+        self.hash = HashSeq(self.seq).hash_value
+        self.base_count = dict(Counter(list(self.seq.upper())))
+        self.length = len(self.seq)
+        self.gc = (self.base_count.get('G', 0) + self.base_count.get('C', 0)) / self.length
+
+        self.names = []
+
+    def __repr__(self):
+        return f'len: {self.length}, gc: {self.gc}, base_count: {self.base_count}, names: {self.names}'
+
+
+class CDMProtein:
+
+    def __init__(self, seq: str):
+        _seq = seq
+        if _seq[-1] == '*':
+            _seq = _seq[:-1]
+        self.seq = _seq
+        self.hash = HashSeq(self.seq).hash_value
+        self.length = len(self.seq)
+
+        self.names = []
+
+    def __repr__(self):
+        return f'len: {self.length}, hash: {self.hash}'
+
+
+class CDMFeature:
+
+    def __init__(self, feature_id: str, contig_hash, start, end, strand, attributes=None):
+        self.id = feature_id
+        self.contig_hash = contig_hash
+        self.start = start
+        self.end = end
+        self.strand = strand
+        self.attributes = {} if attributes is None else attributes
+
+        self.names = []
 
 
 class GffRecord:
