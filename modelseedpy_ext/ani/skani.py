@@ -32,6 +32,10 @@ def _read_search_output_as_parquet(filename, sep='\t'):
         return pa_table
 
 
+def read_search_output_as_parquet(filename, sep='\t'):
+    return _read_search_output_as_parquet(filename, sep)
+
+
 def _read_triangle_output_as_parquet(filename, sep='\t'):
     import pyarrow as pa
 

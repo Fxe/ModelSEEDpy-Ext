@@ -1,4 +1,6 @@
 from modelseedpy_ext.re.hash_seq import HashSeq
+from modelseedpy_ext.ani.skani import read_search_output_as_parquet
+from modelseedpy_ext.re.cdm.query_pangenome import QueryPangenomes
 
 
 def get_ko2(d):
@@ -47,10 +49,11 @@ def collect_ontology(_doc):
 
 class ReportFactory:
 
-    def __init__(self, genome):
+    def __init__(self, genome, pg: QueryPangenomes):
         self.genome = genome
         self.genome_feature_h = ReportFactory.feature_to_h(self.genome)
         self.genome_feature_bakta = {}
+        self.pg = pg
 
     @staticmethod
     def feature_to_h(g):
@@ -86,7 +89,19 @@ class ReportFactory:
             }
             features[f.id] = feature_data
 
-    def build_pangenome_table(self):
+    @staticmethod
+    def get_query_to_ref(f: str):
+        df_ani = read_search_output_as_parquet(f).to_pandas()
+        query_to_ref = {}
+        for row_id, d in df_ani.iterrows():
+            grow_handle = d['Query_file'].split('/')[-1]
+            gtdb_ncbi = d['Ref_file'].split('/')[-1].rsplit('_', 1)[0]
+            if grow_handle not in query_to_ref:
+                query_to_ref[grow_handle] = {}
+            query_to_ref[grow_handle][gtdb_ncbi] = [d['ANI'], d['Align_fraction_ref'], d['Align_fraction_query']]
+        pass
+
+    def build_pan_table(self, fn_ani_ref, fn_ani_clade):
         """
         Table Pangenome:
         cluster_id n_members core
@@ -95,11 +110,29 @@ class ReportFactory:
         feature_id
         :return:
         """
-        # ani ref genomes
-        # ani member genomes
-        # pangenome clusters
-        # pangenome cluster annotation
-        pass
+
+        ref_ani = fn_ani_ref(self.genome)
+
+        member_id_top_hit, ani_values = max(ref_ani, key=lambda x: x[1][0])
+        clade_id = self.pg.get_member_representative(member_id_top_hit)
+        clade_members = self.pg.get_clade_members(clade_id)
+
+        pan_member_features = {}
+        pan_member_assembly = {}
+        for row in clade_members.iter_rows(named=True):
+            pan_member_features[row['genome_id']] = self.pg.get_member_genome(row['genome_id'])
+            pan_member_assembly[row['genome_id']] = self.pg.get_member_assembly(row['genome_id'])
+
+        clade_gene_clusters = self.pg.get_clade_gene_clusters(clade_id)
+
+        return {
+            'ani_ref_top_hit': [member_id_top_hit, ani_values],
+            'ani_clade_members': None,
+            'pan_member_metadata': clade_members,
+            'pan_member_features': pan_member_features,
+            'pan_member_assembly': pan_member_assembly,
+            'pan_gene_clusters': clade_gene_clusters,
+        }
 
     def build_phenotype_kegg(self, modules, ko_to_feature, ko_to_clusters, ko_to_hybrid_clusters):
         filter_pathways = set(modules.pathway_names.keys())
