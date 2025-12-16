@@ -18,6 +18,8 @@ class QueryPangenomes:
         self.lf_genome_ani = pl.scan_parquet(str(parquet_dir / "*.parquet"))
         self.lf_gtdb_species_clade = pl.scan_csv(f'{base_dir}/csv/table_gtdb_species_clade_V1.1.tsv', separator='\t')
         self.lf_genome = pl.scan_csv(f'{base_dir}/csv/table_genome_V1.1.tsv', separator='\t')
+        self.lf_gene_genecluster = pl.scan_csv(f'{base_dir}/csv/table_gene_genecluster_junction_V1.0.tsv',
+                                               separator='\t')
 
     def get_clade_gene_clusters(self, clade_id):
         return self.lf_gene_cluster.filter((pl.col("gtdb_species_clade_id") == clade_id)).collect()
@@ -25,8 +27,11 @@ class QueryPangenomes:
     def get_clade_by_member(self, member_id):
         pass
 
-    def get_gene_cluster_members(self, cluster_id):
-        pass
+    def get_cluster_members(self, cluster_id: str):
+        return self.lf_gene_genecluster.filter((pl.col("gene_cluster_id") == cluster_id)).collect()
+
+    def get_clusters_members(self, cluster_ids):
+        return self.lf_gene_genecluster.filter((pl.col("gene_cluster_id").is_in(cluster_ids))).collect()
 
     def get_clade_members(self, clade_id):
         return self.lf_genome.filter(

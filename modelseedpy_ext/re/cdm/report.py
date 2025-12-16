@@ -101,7 +101,7 @@ class ReportFactory:
             query_to_ref[grow_handle][gtdb_ncbi] = [d['ANI'], d['Align_fraction_ref'], d['Align_fraction_query']]
         pass
 
-    def build_pan_table(self, fn_ani_ref, fn_ani_clade):
+    def build_pan_table(self, fn_ani_ref, fn_ani_clade, col_bakta):
         """
         Table Pangenome:
         cluster_id n_members core
@@ -113,7 +113,7 @@ class ReportFactory:
 
         ref_ani = fn_ani_ref(self.genome)
 
-        member_id_top_hit, ani_values = max(ref_ani, key=lambda x: x[1][0])
+        member_id_top_hit, ani_values = max(ref_ani.items(), key=lambda x: x[1][0])
         clade_id = self.pg.get_member_representative(member_id_top_hit)
         clade_members = self.pg.get_clade_members(clade_id)
 
@@ -125,6 +125,30 @@ class ReportFactory:
 
         clade_gene_clusters = self.pg.get_clade_gene_clusters(clade_id)
 
+        clade_cluster_ids = set(clade_gene_clusters['gene_cluster_id'])
+
+        df_gene_genecluster = self.pg.get_clusters_members(clade_cluster_ids)
+
+        d_gene_to_cluster = {o[0]: o[1] for o in df_gene_genecluster.iter_rows()}
+        d_cluster_to_genes = {}
+        for k, v in d_gene_to_cluster.items():
+            if v not in d_cluster_to_genes:
+                d_cluster_to_genes[v] = set()
+            d_cluster_to_genes[v].add(k)
+
+        feature_id_to_protein_h = {}
+        u_proteins = {}
+        for g in pan_member_features.values():
+            for f in g.features:
+                if f.seq:
+                    h_seq = HashSeq(f.seq)
+                    h = h_seq.hash_value
+                    feature_id_to_protein_h[f.id] = h
+                    u_proteins[h] = str(h_seq)
+
+        cursor = col_bakta.find({'_id': {'$in': list(u_proteins)}})
+        u_proteins_bakta = {_doc['_id']: _doc for _doc in cursor}
+
         return {
             'ani_ref_top_hit': [member_id_top_hit, ani_values],
             'ani_clade_members': None,
@@ -132,6 +156,10 @@ class ReportFactory:
             'pan_member_features': pan_member_features,
             'pan_member_assembly': pan_member_assembly,
             'pan_gene_clusters': clade_gene_clusters,
+            'cluster_to_genes': d_cluster_to_genes,  # cluster to member ids (feature id)
+            'u_proteins': u_proteins_bakta,  # NR Protein collection of pan-genome
+            'feature_id_to_protein_h': u_proteins_bakta,  # Feature collection to Protein Hash
+            'u_proteins_bakta': u_proteins_bakta,  # NR Protein Bakta annotation
         }
 
     def build_phenotype_kegg(self, modules, ko_to_feature, ko_to_clusters, ko_to_hybrid_clusters):
