@@ -27,6 +27,8 @@ def collect_ontology(_doc):
             ontology.append(['uniref_50', db_xref])
         elif db_xref.startswith('UniRef:UniRef90'):
             ontology.append(['uniref_90', db_xref])
+        elif db_xref.startswith('UniRef:UniRef100'):
+            ontology.append(['uniref_100', db_xref])
         elif db_xref.startswith('SO:'):
             ontology.append(['so', db_xref])
         elif db_xref.startswith('EC:'):
@@ -42,7 +44,7 @@ def collect_ontology(_doc):
         elif db_xref.startswith('UniRef:UniRef100:'):
             ontology.append(['uniref_100', db_xref])
         else:
-            #print(db_xref)
+            print(db_xref)
             pass
     return ontology
 
@@ -157,8 +159,8 @@ class ReportFactory:
             'pan_member_assembly': pan_member_assembly,
             'pan_gene_clusters': clade_gene_clusters,
             'cluster_to_genes': d_cluster_to_genes,  # cluster to member ids (feature id)
-            'u_proteins': u_proteins_bakta,  # NR Protein collection of pan-genome
-            'feature_id_to_protein_h': u_proteins_bakta,  # Feature collection to Protein Hash
+            'u_proteins': u_proteins,  # NR Protein collection of pan-genome
+            'feature_id_to_protein_h': feature_id_to_protein_h,  # Feature collection to Protein Hash
             'u_proteins_bakta': u_proteins_bakta,  # NR Protein Bakta annotation
         }
 
