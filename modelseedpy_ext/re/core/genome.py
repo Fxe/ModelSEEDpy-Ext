@@ -40,6 +40,16 @@ class ProteinSequence(HashSeq):
         return zlib.compress(str(self).encode("utf-8"))
 
 
+def convert_kbase_location(feature_location):
+    contig, p0, strand, sz = feature_location
+    start = p0
+    end = start + sz - 1
+    if strand == '-':
+        end = p0
+        start = end - sz + 1
+    return contig, start, end, strand
+
+
 def get_gff_contig_id(f):
     _id = f.id
     contig_id = _id[::-1].split('_', 1)[1][::-1] # reverse split once reverse again
@@ -58,6 +68,21 @@ def get_gff_coord(f):
     else:
         raise ValueError(f'bad strand: {_p_strand}')
     return start, end, strand
+
+
+def get_gff_location(f):
+    contig = get_gff_contig_id(f)
+    start, end, strand = get_gff_coord(f)
+    return contig, start, end, strand
+
+
+def get_kbase_location(f):
+    locations = f.location
+    if len(locations) > 1:
+        raise ValueError('!')
+
+    contig, start, end, strand = convert_kbase_location(f.location[0])
+    return contig, start, end, strand
 
 
 def _from_str(s):

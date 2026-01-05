@@ -28,6 +28,24 @@ class PanGenomeFeature(Base):
     )
 
 
+class GenomeFeature(Base):
+    __tablename__ = "genome_features"
+
+    id         = Column(Integer, primary_key=True)
+    genome_id  = Column(String, nullable=False)
+    contig_id  = Column(String, nullable=False)
+    feature_id = Column(String, nullable=False)
+    length     = Column(Integer, nullable=False)
+    start      = Column(Integer)
+    end        = Column(Integer)
+    strand     = Column(String)
+    annotation = Column(BLOB, nullable=False)  # JSONB stored as BLOB
+
+    __table_args__ = (
+        UniqueConstraint("genome_id", "contig_id", "feature_id", name="uq_feature"),
+    )
+
+
 def load_tables(table_pan_genome_features):
     engine = create_engine("sqlite:///berdl_tables.db", future=True)
 

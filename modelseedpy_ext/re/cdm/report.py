@@ -1,6 +1,7 @@
 from modelseedpy_ext.re.hash_seq import HashSeq
 from modelseedpy_ext.ani.skani import read_search_output_as_parquet
 from modelseedpy_ext.re.cdm.query_pangenome import QueryPangenomes
+from modelseedpy_ext.re.cdm.core import ClusterSet
 
 
 def get_ko2(d):
@@ -73,6 +74,9 @@ class ReportFactory:
             else:
                 print('!')
 
+    def cluster_query_to_pangenome(self, cluster: ClusterSet):
+        pass
+
     def build_gene_table(self):
         """
         Table gene
@@ -103,20 +107,7 @@ class ReportFactory:
             query_to_ref[grow_handle][gtdb_ncbi] = [d['ANI'], d['Align_fraction_ref'], d['Align_fraction_query']]
         pass
 
-    def build_pan_table(self, fn_ani_ref, fn_ani_clade, col_bakta):
-        """
-        Table Pangenome:
-        cluster_id n_members core
-
-        Table Pangenome Member Features
-        feature_id
-        :return:
-        """
-
-        ref_ani = fn_ani_ref(self.genome)
-
-        member_id_top_hit, ani_values = max(ref_ani.items(), key=lambda x: x[1][0])
-        clade_id = self.pg.get_member_representative(member_id_top_hit)
+    def build_pan_table_from_clade_id(self, clade_id, col_bakta):
         clade_members = self.pg.get_clade_members(clade_id)
 
         pan_member_features = {}
@@ -152,7 +143,6 @@ class ReportFactory:
         u_proteins_bakta = {_doc['_id']: _doc for _doc in cursor}
 
         return {
-            'ani_ref_top_hit': [member_id_top_hit, ani_values],
             'ani_clade_members': None,
             'pan_member_metadata': clade_members,
             'pan_member_features': pan_member_features,
@@ -163,6 +153,32 @@ class ReportFactory:
             'feature_id_to_protein_h': feature_id_to_protein_h,  # Feature collection to Protein Hash
             'u_proteins_bakta': u_proteins_bakta,  # NR Protein Bakta annotation
         }
+
+    def build_pan_table(self, fn_ani_ref, fn_ani_clade, col_bakta):
+        """
+        Table Pangenome:
+        cluster_id n_members core
+
+        Table Pangenome Member Features
+        feature_id
+        :return:
+        """
+
+        ref_ani = fn_ani_ref(self.genome)
+
+        member_id_top_hit, ani_values = max(ref_ani.items(), key=lambda x: x[1][0])
+        clade_id = self.pg.get_member_representative(member_id_top_hit)
+        res = self.build_pan_table_from_clade_id(clade_id, col_bakta)
+        res['ani_ref_top_hit'] = [member_id_top_hit, ani_values]
+        return res
+
+    def wut(self, pan_data):
+        pan_c_to_m = {}
+        pan_m_to_c = {}
+        for cluster_id, members in pan_data['cluster_to_genes'].items():
+            pan_c_to_m[cluster_id] = [pan_data['feature_id_to_protein_h'][m] for m in members]
+            for m in pan_c_to_m[cluster_id]:
+                pan_m_to_c[m] = cluster_id
 
     def build_phenotype_kegg(self, modules, ko_to_feature, ko_to_clusters, ko_to_hybrid_clusters):
         filter_pathways = set(modules.pathway_names.keys())

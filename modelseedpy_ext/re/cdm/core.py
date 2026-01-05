@@ -2,16 +2,6 @@ import uuid
 from modelseedpy_ext.re.hash_seq import HashSeq
 
 
-def convert_kbase_location(feature_location):
-    contig, p0, strand, sz = feature_location
-    start = p0
-    end = start + sz - 1
-    if strand == '-':
-        end = p0
-        start = end - sz + 1
-    return contig, start, end, strand
-
-
 def generate_uuid():
     return str(uuid.uuid4())
 
@@ -19,6 +9,36 @@ def generate_uuid():
 def generate_cdm_uuid(prefix):
     _uuid = generate_uuid()
     return f'{prefix}-{_uuid}'
+
+
+class ClusterSet:
+
+    def __init__(self, clusters: dict):
+        self.members = {}
+        self.clusters = clusters
+        self.m_to_c = {}
+        for c, members in self.clusters.items():
+            for m in members:
+                self.m_to_c[m] = c
+
+    def get_cluster_by_member(self, member_id):
+        return self.m_to_c[member_id]
+
+    def get_cluster_members(self, cluster_id):
+        return self.clusters[cluster_id]
+
+    @staticmethod
+    def from_mmseqs2(filename_cluster_tsv):
+        from collections import defaultdict
+
+        c_to_m = defaultdict(set)
+
+        with open(filename_cluster_tsv) as fh:
+            for line in fh:
+                rep, mem = line.strip().split("\t")
+                c_to_m[rep].add(mem)
+
+        return ClusterSet(c_to_m)
 
 
 class ProteinSequence(HashSeq):
