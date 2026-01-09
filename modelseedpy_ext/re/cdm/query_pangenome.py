@@ -20,6 +20,8 @@ class QueryPangenomes:
         self.lf_genome = pl.scan_csv(f'{base_dir}/csv/table_genome_V1.1.tsv', separator='\t')
         self.lf_gene_genecluster = pl.scan_csv(f'{base_dir}/csv/table_gene_genecluster_junction_V1.0.tsv',
                                                separator='\t')
+        self.lf_gtdb_metadata = pl.scan_csv(f'{base_dir}/csv/table_gtdb_species_clade_V1.1.tsv', separator='\t')
+        self.lf_ncbi_env = pl.scan_csv(f'{base_dir}/csv/table_NCBI_env_V1.1.tsv', separator='\t')
 
     def get_clade_gene_clusters(self, clade_id):
         return self.lf_gene_cluster.filter((pl.col("gtdb_species_clade_id") == clade_id)).collect()

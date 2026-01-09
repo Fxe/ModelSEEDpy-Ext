@@ -12,6 +12,55 @@ def convert_location(feature_location):
     return contig, start, end, strand
 
 
+class SortedContigFeatures:
+
+    def __init__(self, contig_feature: dict):
+        """
+
+        :param contig_feature: dict with features sorted by low to high based no starting base position in contig
+        """
+        self.ctg_feature_sort = contig_feature
+
+    @staticmethod
+    def from_genome(genome, fn_location_conv):
+        ctg_feature_sort = {}
+        for f in genome.features:
+            contig_id, start, end, strand = fn_location_conv(f)
+            if contig_id not in ctg_feature_sort:
+                ctg_feature_sort[contig_id] = {}
+            if start not in ctg_feature_sort[contig_id]:
+                ctg_feature_sort[contig_id][start] = f
+            else:
+                raise ValueError(f'more than 1 feature starts at position: {start}')
+
+        return SortedContigFeatures(ctg_feature_sort)
+
+
+class GenomeFeaturePairFreq:
+
+    def __init__(self, fn_transform):
+        self.genomes = {}
+        self.sorted_features = {}
+        self.pair_freq = {}
+        self.fn_transform = fn_transform
+
+    def add_genome(self, genome_id, genome, fn_location_conv):
+        self.genomes[genome_id] = genome
+        self.sorted_features[genome_id] = SortedContigFeatures.from_genome(genome, fn_location_conv)
+
+        ctg_feature_sort = self.sorted_features[genome_id].ctg_feature_sort
+
+        for contig, data in ctg_feature_sort.items():
+            arr_sorted = [data[k] for k in sorted(data)]
+            for f1, f2 in zip(arr_sorted, arr_sorted[1:]):
+                p = (self.fn_transform(f1), self.fn_transform(f1))
+                p_rev = (p[1], p[0])
+
+                if p not in self.pair_freq:
+                    self.pair_freq[p] = set()
+                self.pair_freq[p].add(genome_id)
+
+
 class ProteinNetworkFactory:
 
     def __init__(self):

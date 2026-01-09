@@ -85,6 +85,11 @@ def get_kbase_location(f):
     return contig, start, end, strand
 
 
+def get_coords_genemark(f):
+    contig, start, end, strand, props = f.description.split(' ', 4)
+    return contig, int(start), int(end), strand
+
+
 def _from_str(s):
     contig_id, source, feature_type, start, end, score, strand, phase, attr_str = s.strip().split('\t')
     attr_str = attr_str[:-1] if attr_str[-1] == ';' else attr_str

@@ -1,7 +1,11 @@
+import os
+from modelseedpy import MSGenome
 from modelseedpy_ext.re.hash_seq import HashSeq
+from modelseedpy_ext.re.core.genome import ProteinSequence
 from modelseedpy_ext.ani.skani import read_search_output_as_parquet
 from modelseedpy_ext.re.cdm.query_pangenome import QueryPangenomes
 from modelseedpy_ext.re.cdm.core import ClusterSet
+from collections import defaultdict
 
 
 def get_ko2(d):
@@ -45,22 +49,171 @@ def collect_ontology(_doc):
         elif db_xref.startswith('UniRef:UniRef100:'):
             ontology.append(['uniref_100', db_xref])
         else:
-            print(db_xref)
-            pass
+            ontology.append(['others', db_xref])
     return ontology
 
 
 class ReportFactory:
 
-    def __init__(self, genome, pg: QueryPangenomes):
+    def __init__(self, genome: MSGenome, assembly: MSGenome, pg: QueryPangenomes):
         self.genome = genome
+        self.assembly = assembly
         self.genome_feature_h = ReportFactory.feature_to_h(self.genome)
         self.genome_feature_bakta = {}
         self.pg = pg
+        if not os.path.exists('./query_genome.faa'):
+            pass
+        if not os.path.exists('./query_assembly.fna'):
+            pass
+        self.data_pan_genome = None
+        self.c_to_m = None  # Cluster To Members
+        self.m_to_c = None  # Member To Cluster
+
+    def write_genome_files(self):
+        if not os.path.exists('./query_genome.faa'):
+            self.genome.to_fasta('./query_genome.faa')
+        if not os.path.exists('./query_assembly.fna'):
+            self.assembly.to_fasta('./query_assembly.fna')
+
+    @staticmethod
+    def run_ani(query, library, output_file, threads=20):
+        import subprocess
+        threads = threads
+        cmd = [
+            '/opt/skani/0.3.1/skani', 'search', "-t", str(threads),
+            "-q", query,
+            "-d", library,
+            "-o", output_file,
+        ]
+        output = subprocess.run(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True
+        )
+        return output
+
+    @staticmethod
+    def run_mmseqs2(threads=40):
+        import subprocess
+        cmd = [
+            '/opt/mmseqs2/15-6f452/bin/mmseqs', 'easy-cluster', "--threads", str(threads),
+            '--min-seq-id', '0.0',
+            '--cov-mode', '0', '-c', '0.80',
+            "./all_proteins.faa", 'mmseqs2', 'mmseqs2'
+        ]
+        output = subprocess.run(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True
+        )
+        return output
+
+    def get_query_genome_to_pan_genome_clusters(self):
+        if not os.path.exists('./mmseqs2_cluster.tsv'):
+            program_out = ReportFactory.run_mmseqs2()
+
+        self.c_to_m = defaultdict(set)
+        self.m_to_c = {}
+
+        with open("./mmseqs2_cluster.tsv", 'r') as fh:
+            for line in fh:
+                rep, mem = line.strip().split("\t")
+                self.c_to_m[rep].add(mem)
+                self.m_to_c[mem] = rep
+
+        pan_c_to_m = {}
+        pan_m_to_c = {}
+        for cluster_id, members in self.data_pan_genome['cluster_to_genes'].items():
+            pan_c_to_m[cluster_id] = [self.data_pan_genome['feature_id_to_protein_h'][m] for m in members]
+            for m in pan_c_to_m[cluster_id]:
+                pan_m_to_c[m] = cluster_id
+
+        pan_c_to_m_mapped_to_representative = {}
+        for cluster_id, members in pan_c_to_m.items():
+            pan_c_to_m_mapped_to_representative[cluster_id] = [self.m_to_c[m] for m in members]
+
+        representative_to_pan_cluster_id = {}
+        for cluster_id, reps in pan_c_to_m_mapped_to_representative.items():
+            unique_reps = set(reps)
+            for rep in unique_reps:
+                if rep not in representative_to_pan_cluster_id:
+                    representative_to_pan_cluster_id[rep] = set()
+                representative_to_pan_cluster_id[rep].add(cluster_id)
+
+        return pan_c_to_m, pan_m_to_c, pan_c_to_m_mapped_to_representative, representative_to_pan_cluster_id
+
+    def get_ani(self):
+        self.write_genome_files()
+        from modelseedpy_ext.ani.skani import _read_search_output_as_parquet
+
+        if not os.path.exists('./ani_kepangenomes_fast.out'):
+            program_out = ReportFactory.run_ani('./query_assembly.fna',
+                                  '/home/fliu/scratch/data/ani/skani/ke-pangenomes_fast',
+                                  './ani_kepangenomes_fast.out')
+        df_ani_clade = _read_search_output_as_parquet('./ani_kepangenomes_fast.out').to_pandas()
+        if not os.path.exists('./ani_phenotypes_fast.out'):
+            program_out = ReportFactory.run_ani('./query_assembly.fna',
+                                  '/home/fliu/scratch/data/ani/skani/cdm_fast_phenotypes',
+                                  './ani_phenotypes_fast.out')
+        df_ani_phenotypes = _read_search_output_as_parquet('./ani_phenotypes_fast.out').to_pandas()
+
+        def t_ncbi_to_gtdb_id(s):
+            a = s.split('_')
+            if s.startswith('GCA'):
+                return f'GB_{a[0]}_{a[1]}'
+            elif s.startswith('GCF'):
+                return f'RS_{a[0]}_{a[1]}'
+
+        def q_transform(s):
+            return 'user_genome'
+
+        def r_transform(s):
+            return t_ncbi_to_gtdb_id(s.split('/')[-1].rsplit('_', 1)[0])
+
+        def ani_transform(df, fn_q_transform, fn_r_transform):
+            query_to_ref = {}
+            for row_id, d in df.iterrows():
+                q = fn_q_transform(d['Query_file'])
+                r = fn_r_transform(d['Ref_file'])
+                if q not in query_to_ref:
+                    query_to_ref[q] = {}
+                query_to_ref[q][r] = [d['ANI'], d['Align_fraction_ref'], d['Align_fraction_query']]
+            return query_to_ref
+
+        import pandas as pd
+        df_anl_ecoli = pd.read_csv('/home/fliu/CDM/ecoli/data/genomes/metadata.tsv', sep='\t')
+        df_pmi = pd.read_csv('/home/fliu/CDM/pmi/data/genomes/metadata_pmi.tsv', sep='\t')
+        df_leaf = pd.read_csv('/home/fliu/CDM/pmi/data/genomes/metadata_atleaf.tsv', sep='\t')
+        contig_h_to_genome_id = {}
+        for row_id, row in df_anl_ecoli.iterrows():
+            if row['h'] not in contig_h_to_genome_id:
+                contig_h_to_genome_id[row['h']] = row['genome_id']
+            else:
+                raise ValueError('dup')
+        for row_id, row in df_pmi.iterrows():
+            h = row['hash_contigset']
+            if h not in contig_h_to_genome_id:
+                contig_h_to_genome_id[h] = row['genome_id']
+            else:
+                raise ValueError('dup')
+        for row_id, row in df_leaf.iterrows():
+            h = row['hash_contigset']
+            if h not in contig_h_to_genome_id:
+                contig_h_to_genome_id[h] = row['genome_id']
+            else:
+                raise ValueError('dup')
+
+        def r_transform_phenotypes(s):
+            return contig_h_to_genome_id[s.split('/')[-1][:-4]]
+
+        return ani_transform(
+            df_ani_clade,
+            q_transform,
+            r_transform
+        ), ani_transform(
+            df_ani_phenotypes,
+            q_transform,
+            r_transform_phenotypes)
 
     @staticmethod
     def feature_to_h(g):
-        return {f.id: HashSeq(f.seq).hash_value for f in g.features if f.seq}
+        return {f.id: ProteinSequence(f.seq).hash_value for f in g.features if f.seq}
 
     def get_annotation_bakta(self, col_bakta):
         cursor = col_bakta.find({'_id': {
@@ -74,7 +227,7 @@ class ReportFactory:
             else:
                 print('!')
 
-    def cluster_query_to_pangenome(self, cluster: ClusterSet):
+    def cluster_query_to_pan_genome(self, cluster: ClusterSet):
         pass
 
     def build_gene_table(self):
