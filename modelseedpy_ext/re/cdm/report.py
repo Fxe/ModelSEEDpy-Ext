@@ -147,11 +147,6 @@ class ReportFactory:
                                   '/home/fliu/scratch/data/ani/skani/ke-pangenomes_fast',
                                   './ani_kepangenomes_fast.out')
         df_ani_clade = _read_search_output_as_parquet('./ani_kepangenomes_fast.out').to_pandas()
-        if not os.path.exists('./ani_phenotypes_fast.out'):
-            program_out = ReportFactory.run_ani('./query_assembly.fna',
-                                  '/home/fliu/scratch/data/ani/skani/cdm_fast_phenotypes',
-                                  './ani_phenotypes_fast.out')
-        df_ani_phenotypes = _read_search_output_as_parquet('./ani_phenotypes_fast.out').to_pandas()
 
         def t_ncbi_to_gtdb_id(s):
             a = s.split('_')
@@ -176,40 +171,51 @@ class ReportFactory:
                 query_to_ref[q][r] = [d['ANI'], d['Align_fraction_ref'], d['Align_fraction_query']]
             return query_to_ref
 
-        import pandas as pd
-        df_anl_ecoli = pd.read_csv('/home/fliu/CDM/ecoli/data/genomes/metadata.tsv', sep='\t')
-        df_pmi = pd.read_csv('/home/fliu/CDM/pmi/data/genomes/metadata_pmi.tsv', sep='\t')
-        df_leaf = pd.read_csv('/home/fliu/CDM/pmi/data/genomes/metadata_atleaf.tsv', sep='\t')
-        contig_h_to_genome_id = {}
-        for row_id, row in df_anl_ecoli.iterrows():
-            if row['h'] not in contig_h_to_genome_id:
-                contig_h_to_genome_id[row['h']] = row['genome_id']
-            else:
-                raise ValueError('dup')
-        for row_id, row in df_pmi.iterrows():
-            h = row['hash_contigset']
-            if h not in contig_h_to_genome_id:
-                contig_h_to_genome_id[h] = row['genome_id']
-            else:
-                raise ValueError('dup')
-        for row_id, row in df_leaf.iterrows():
-            h = row['hash_contigset']
-            if h not in contig_h_to_genome_id:
-                contig_h_to_genome_id[h] = row['genome_id']
-            else:
-                raise ValueError('dup')
+        if not os.path.exists('./ani_phenotypes_fast.out'):
+            program_out = ReportFactory.run_ani('./query_assembly.fna',
+                                  '/home/fliu/scratch/data/ani/skani/cdm_fast_phenotypes',
+                                  './ani_phenotypes_fast.out')
 
-        def r_transform_phenotypes(s):
-            return contig_h_to_genome_id[s.split('/')[-1][:-4]]
+        _pq = _read_search_output_as_parquet('./ani_phenotypes_fast.out')
+
+        ani_phenotypes = None
+
+        if _pq:
+            df_ani_phenotypes = _pq.to_pandas()
+
+            import pandas as pd
+            df_anl_ecoli = pd.read_csv('/home/fliu/CDM/ecoli/data/genomes/metadata.tsv', sep='\t')
+            df_pmi = pd.read_csv('/home/fliu/CDM/pmi/data/genomes/metadata_pmi.tsv', sep='\t')
+            df_leaf = pd.read_csv('/home/fliu/CDM/pmi/data/genomes/metadata_atleaf.tsv', sep='\t')
+            contig_h_to_genome_id = {}
+            for row_id, row in df_anl_ecoli.iterrows():
+                if row['h'] not in contig_h_to_genome_id:
+                    contig_h_to_genome_id[row['h']] = row['genome_id']
+                else:
+                    raise ValueError('dup')
+            for row_id, row in df_pmi.iterrows():
+                h = row['hash_contigset']
+                if h not in contig_h_to_genome_id:
+                    contig_h_to_genome_id[h] = row['genome_id']
+                else:
+                    raise ValueError('dup')
+            for row_id, row in df_leaf.iterrows():
+                h = row['hash_contigset']
+                if h not in contig_h_to_genome_id:
+                    contig_h_to_genome_id[h] = row['genome_id']
+                else:
+                    raise ValueError('dup')
+
+            def r_transform_phenotypes(s):
+                return contig_h_to_genome_id[s.split('/')[-1][:-4]]
+
+            ani_phenotypes = ani_transform(df_ani_phenotypes, q_transform, r_transform_phenotypes)
 
         return ani_transform(
             df_ani_clade,
             q_transform,
             r_transform
-        ), ani_transform(
-            df_ani_phenotypes,
-            q_transform,
-            r_transform_phenotypes)
+        ), ani_phenotypes
 
     @staticmethod
     def feature_to_h(g):
