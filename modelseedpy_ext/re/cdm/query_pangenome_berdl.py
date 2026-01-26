@@ -30,9 +30,9 @@ Issue 1: gtdb_species_clade_id with '--' chars causes 500 errors with '=' operat
     Example: 's__Staphylococcus_lugdunensis--RS_GCF_002901705.1'
           -> LIKE '%Staphylococcus_lugdunensis%'
 
-Issue 2: gene_genecluster_junction table (1B rows) times out with LIMIT > 1
-    Workaround: Use LIMIT 1 with pagination to avoid full table scans
-    (LIMIT > 1 causes full table scan when fewer records exist than requested)
+Issue 2: gene_genecluster_junction table (1B rows) needs smaller page size
+    Workaround: Use LIMIT 100 instead of 1000 for pagination
+    (Very large limits can cause timeouts on billion-row tables)
 
 === USAGE ===
 
@@ -76,6 +76,7 @@ class QueryPangenomesBERDL:
 
     # API settings
     PAGE_LIMIT = 1000
+    JUNCTION_PAGE_LIMIT = 100  # Smaller limit for 1B row junction table
     MAX_RETRIES = 3
     RETRY_DELAY = 2
     TIMEOUT = 120
@@ -206,22 +207,21 @@ class QueryPangenomesBERDL:
 
         return pd.DataFrame(all_results)
 
-    def _execute_query_limit1(self, query: str, max_results: int = 10000) -> pd.DataFrame:
+    def _execute_query_junction(self, query: str, max_results: int = 10000) -> pd.DataFrame:
         """
-        Execute a SQL query using LIMIT 1 pagination.
+        Execute a SQL query with smaller page size for junction table.
 
-        This is needed for very large tables (like gene_genecluster_junction with 1B rows)
-        where LIMIT > 1 causes a full table scan if fewer records exist than requested.
-
-        By using LIMIT 1 and paginating, we avoid the timeout issue.
+        Uses JUNCTION_PAGE_LIMIT (100) instead of PAGE_LIMIT (1000) for the
+        gene_genecluster_junction table (1B rows) to avoid timeouts.
         """
         all_results = []
         offset = 0
 
         while len(all_results) < max_results:
+            page_limit = min(self.JUNCTION_PAGE_LIMIT, max_results - len(all_results))
             payload = {
                 "query": query,
-                "limit": 1,
+                "limit": page_limit,
                 "offset": offset
             }
 
@@ -243,7 +243,7 @@ class QueryPangenomesBERDL:
                         if not data.get('pagination', {}).get('has_more', False):
                             return pd.DataFrame(all_results)
 
-                        offset += 1
+                        offset += page_limit
                         break
 
                     elif response.status_code == 408:
@@ -282,20 +282,19 @@ class QueryPangenomesBERDL:
         """
         Get all genes belonging to a specific gene cluster.
 
-        Note: Uses LIMIT 1 pagination to avoid timeout on this 1B row table.
-              LIMIT > 1 causes full table scan when fewer records exist.
+        Note: Uses smaller page size (100) for this 1B row junction table.
         """
         query = f"""
             SELECT * FROM {self.SCHEMA}.gene_genecluster_junction
             WHERE gene_cluster_id = '{cluster_id}'
         """
-        return self._execute_query_limit1(query)
+        return self._execute_query_junction(query)
 
     def get_clusters_members(self, cluster_ids: List[str]) -> pd.DataFrame:
         """
         Get all genes belonging to multiple gene clusters.
 
-        Note: Queries one cluster at a time with LIMIT 1 pagination.
+        Note: Queries one cluster at a time with smaller page size.
               This avoids timeouts on the 1B row junction table.
         """
         if not cluster_ids:
