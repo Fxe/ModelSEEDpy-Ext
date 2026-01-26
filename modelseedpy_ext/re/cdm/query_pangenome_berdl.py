@@ -30,8 +30,9 @@ Issue 1: gtdb_species_clade_id with '--' chars causes 500 errors with '=' operat
     Example: 's__Staphylococcus_lugdunensis--RS_GCF_002901705.1'
           -> LIKE '%Staphylococcus_lugdunensis%'
 
-Issue 2: gene_genecluster_junction table (1B rows) times out with IN clauses
-    Workaround: Query one cluster at a time sequentially
+Issue 2: gene_genecluster_junction table (1B rows) times out with LIMIT > 1
+    Workaround: Use LIMIT 1 with pagination to avoid full table scans
+    (LIMIT > 1 causes full table scan when fewer records exist than requested)
 
 === USAGE ===
 
@@ -205,6 +206,65 @@ class QueryPangenomesBERDL:
 
         return pd.DataFrame(all_results)
 
+    def _execute_query_limit1(self, query: str, max_results: int = 10000) -> pd.DataFrame:
+        """
+        Execute a SQL query using LIMIT 1 pagination.
+
+        This is needed for very large tables (like gene_genecluster_junction with 1B rows)
+        where LIMIT > 1 causes a full table scan if fewer records exist than requested.
+
+        By using LIMIT 1 and paginating, we avoid the timeout issue.
+        """
+        all_results = []
+        offset = 0
+
+        while len(all_results) < max_results:
+            payload = {
+                "query": query,
+                "limit": 1,
+                "offset": offset
+            }
+
+            retries = 0
+            while retries <= self.MAX_RETRIES:
+                try:
+                    response = requests.post(
+                        self.BERDL_API_URL,
+                        headers=self.headers,
+                        json=payload,
+                        timeout=self.TIMEOUT
+                    )
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        results = data.get('result', [])
+                        all_results.extend(results)
+
+                        if not data.get('pagination', {}).get('has_more', False):
+                            return pd.DataFrame(all_results)
+
+                        offset += 1
+                        break
+
+                    elif response.status_code == 408:
+                        retries += 1
+                        if retries <= self.MAX_RETRIES:
+                            time.sleep(self.RETRY_DELAY * (2 ** (retries - 1)))
+                        else:
+                            raise Exception(f"Query timeout after {self.MAX_RETRIES} retries")
+
+                    else:
+                        raise Exception(f"API error {response.status_code}: {response.text[:200]}")
+
+                except requests.exceptions.Timeout:
+                    retries += 1
+                    if retries <= self.MAX_RETRIES:
+                        time.sleep(self.RETRY_DELAY * (2 ** (retries - 1)))
+                    else:
+                        raise Exception(f"Request timeout after {self.MAX_RETRIES} retries")
+
+        return pd.DataFrame(all_results)
+
     def get_clade_gene_clusters(self, clade_id: str) -> pd.DataFrame:
         """
         Get all gene clusters for a given GTDB species clade.
@@ -221,30 +281,29 @@ class QueryPangenomesBERDL:
     def get_cluster_members(self, cluster_id: str) -> pd.DataFrame:
         """
         Get all genes belonging to a specific gene cluster.
+
+        Note: Uses LIMIT 1 pagination to avoid timeout on this 1B row table.
+              LIMIT > 1 causes full table scan when fewer records exist.
         """
         query = f"""
             SELECT * FROM {self.SCHEMA}.gene_genecluster_junction
             WHERE gene_cluster_id = '{cluster_id}'
         """
-        return self._execute_query(query)
+        return self._execute_query_limit1(query)
 
     def get_clusters_members(self, cluster_ids: List[str]) -> pd.DataFrame:
         """
         Get all genes belonging to multiple gene clusters.
 
-        Note: Queries one cluster at a time due to table size (1B rows).
-              IN clause causes timeouts.
+        Note: Queries one cluster at a time with LIMIT 1 pagination.
+              This avoids timeouts on the 1B row junction table.
         """
         if not cluster_ids:
             return pd.DataFrame(columns=['gene_id', 'gene_cluster_id'])
 
         all_results = []
         for cluster_id in cluster_ids:
-            query = f"""
-                SELECT * FROM {self.SCHEMA}.gene_genecluster_junction
-                WHERE gene_cluster_id = '{cluster_id}'
-            """
-            df = self._execute_query(query)
+            df = self.get_cluster_members(cluster_id)
             all_results.append(df)
 
         if all_results:
@@ -364,6 +423,13 @@ if __name__ == "__main__":
     try:
         df = qp.get_member_ani_matrix('RS_GCF_022568935.1')
         print(f"   Got {len(df)} ANI comparisons")
+    except Exception as e:
+        print(f"   Error: {e}")
+
+    print("\n4. Testing get_cluster_members (LIMIT 1 pagination):")
+    try:
+        df = qp.get_cluster_members('DXZZ01000056.1_1')
+        print(f"   Got {len(df)} genes in cluster")
     except Exception as e:
         print(f"   Error: {e}")
 
